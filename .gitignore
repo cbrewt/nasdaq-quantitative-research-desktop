@@ -1,0 +1,51 @@
+# Python virtual environments
+.venv/
+venv/
+
+# Python compiled files and caches
+__pycache__/
+*.pyc
+*.pyo
+
+# Development and testing caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Credentials and local configuration
+.env
+.env.*
+!.env.example
+credentials.json
+secrets.json
+config.local.json
+
+# IDE configuration
+.vscode/
+.idea/
+
+# Application logs
+logs/
+*.log
+
+# Generated research reports
+reports/
+
+# Local backups and database dumps
+backups/
+*.sql.gz
+
+# Build and distribution artifacts
+build/
+dist/
+*.egg-info/
+
+# Windows system files
+Thumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.bak
