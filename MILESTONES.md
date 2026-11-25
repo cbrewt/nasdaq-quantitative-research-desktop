@@ -417,3 +417,14 @@ Design specification: docs/UID-001_INTERFACE_DESIGN.md. Implementation and runti
 
 
 Formal acceptance: November 25, 2026. User formally accepted Development Step 4 and authorized Development Step 5 under DEV-002.
+
+
+## Milestone 05 - Desktop Application Prototype
+
+Status: COMPLETE - FORMALLY ACCEPTED
+
+User formally accepted prototype and authorized Milestone 06 under DEV-002 on November 25, 2026. Launch, sample results, score display, sorting, filtering and six workspaces verified.
+
+## Milestone 06 - Quantitative Research Engine Integration
+
+Status: IMPLEMENTATION TESTED OFFLINE - LIVE ACCEPTANCE PENDING

@@ -1,7 +1,8 @@
-"""UID-001 demonstration only; no research engine or database access."""
+"""UID-001 screening integration; synchronous until Milestone 07."""
+from ..application.screening import ScreeningRequest, screen, display_row, number
 from PySide6.QtCore import Qt, QSortFilterProxyModel, QRegularExpression
 from PySide6.QtGui import QStandardItemModel, QStandardItem
-from PySide6.QtWidgets import (QMainWindow,QWidget,QVBoxLayout,QHBoxLayout,QFormLayout,QLabel,QPushButton,QListWidget,QStackedWidget,QDoubleSpinBox,QComboBox,QLineEdit,QTableView,QHeaderView,QMessageBox,QGroupBox)
+from PySide6.QtWidgets import (QMainWindow,QWidget,QVBoxLayout,QHBoxLayout,QFormLayout,QLabel,QPushButton,QListWidget,QStackedWidget,QDoubleSpinBox,QComboBox,QLineEdit,QTableView,QHeaderView,QMessageBox,QGroupBox,QApplication)
 
 NAMES = ['Stock Screener','Stock Analysis','Backtesting','Research History','Reports','Settings']
 # Fictional measurements, not calculated by the Version 1.2 engine.
@@ -13,30 +14,31 @@ class Window(QMainWindow):
         super().__init__(); self.setWindowTitle('Nasdaq Quantitative Research V2.0 — Prototype'); self.resize(1280,800); self.setMinimumSize(800,560)
         self.setStyleSheet('''QWidget {background:#141e2c;color:#e5edf6;font-size:14px;} QGroupBox {border:1px solid #394b62;border-radius:6px;margin-top:14px;padding:12px;} QGroupBox::title {subcontrol-origin:margin;left:12px;} QListWidget,QTableView,QLineEdit,QDoubleSpinBox,QComboBox {background:#202e40;border:1px solid #45566b;padding:5px;} QListWidget::item {padding:13px;} QListWidget::item:selected {background:#315c83;} QPushButton {background:#25689e;padding:9px 15px;border-radius:5px;} QPushButton:disabled {background:#303b49;color:#a6b3c2;} QHeaderView::section {background:#2b3d53;padding:7px;border:0;} QTableView {alternate-background-color:#192637;gridline-color:#36465a;} QLabel#heading {font-size:25px;font-weight:bold;} QWidget:focus {outline:1px solid #8ac8fb;}''')
         root=QWidget(); self.setCentralWidget(root); outer=QVBoxLayout(root)
-        banner=QLabel('PROTOTYPE • FICTIONAL DATA ONLY • No live screening or database connection'); banner.setStyleSheet('background:#4b3821;color:#ffe3b0;padding:10px;font-weight:bold'); outer.addWidget(banner)
+        banner=QLabel('LIVE SCREENING • Sample preview available • Database not connected'); banner.setStyleSheet('background:#4b3821;color:#ffe3b0;padding:10px;font-weight:bold'); outer.addWidget(banner)
         body=QHBoxLayout(); outer.addLayout(body,1); self.nav=QListWidget(); self.nav.addItems(NAMES); self.nav.setFixedWidth(215); body.addWidget(self.nav); self.stack=QStackedWidget(); body.addWidget(self.stack,1)
         self.nav.currentRowChanged.connect(self.stack.setCurrentIndex)
-        self.make_screener(); self.make_analysis()
+        self.live_matches=None; self.make_screener(); self.make_analysis()
         for name,description in [('Backtesting','Historical simulation, signals, trades and statistics — integration in Milestone 09.'),('Research History','Saved research runs and parameters — database integration in Milestone 10.'),('Reports','Word report generation and retrieval — integration in Milestone 09.'),('Settings','Application and database configuration — not connected. No credentials are requested or stored.')]:
             _,layout=self.page(name); label=QLabel(description); label.setWordWrap(True); layout.addWidget(label); layout.addStretch()
         for name in ['File','Research','View','Tools','Help']:
             menu=self.menuBar().addMenu(name)
             if name=='File': menu.addAction('Exit',self.close)
-            elif name=='Help': menu.addAction('About prototype',lambda: QMessageBox.information(self,'Prototype','UID-001 demonstration. No real research operations.'))
+            elif name=='Help': menu.addAction('About prototype',lambda: QMessageBox.information(self,'Prototype','UID-001 screening integration. Background processing and cancellation pending.'))
             else:
                 for i,title in enumerate(NAMES): menu.addAction(title,lambda checked=False,i=i:self.nav.setCurrentRow(i))
-        self.nav.setCurrentRow(0); self.statusBar().showMessage('Ready — demonstration only | Database: not connected')
+        self.nav.setCurrentRow(0); self.statusBar().showMessage('Ready | Database: not connected')
     def page(self,name):
         page=QWidget(); layout=QVBoxLayout(page); layout.setContentsMargins(20,14,20,14); label=QLabel(name); label.setObjectName('heading'); layout.addWidget(label); self.stack.addWidget(page); return page,layout
     def make_screener(self):
         _,layout=self.page(NAMES[0]); group=QGroupBox('Screening parameters'); form=QFormLayout(group); self.minimum=QDoubleSpinBox(); self.maximum=QDoubleSpinBox(); self.gain=QDoubleSpinBox()
         for control,value in [(self.minimum,1),(self.maximum,10),(self.gain,10)]: control.setRange(0,1000000); control.setDecimals(2); control.setValue(value)
         self.minimum.setPrefix('$'); self.maximum.setPrefix('$'); self.gain.setSuffix('%'); form.addRow('Minimum price',self.minimum); form.addRow('Maximum price',self.maximum); form.addRow('Minimum gain',self.gain); form.addRow('Observation window',QLabel('21 completed trading sessions')); form.addRow('Reverse splits',QLabel('Excluded (mandatory)')); self.mode=QComboBox(); self.mode.addItems(['Research Mode','Strict Mode']); form.addRow('Mode',self.mode); layout.addWidget(group)
-        controls=QHBoxLayout(); self.run=QPushButton('Preview sample results'); self.run.clicked.connect(self.preview); controls.addWidget(self.run); cancel=QPushButton('Cancel — not available'); cancel.setEnabled(False); controls.addWidget(cancel); layout.addLayout(controls)
-        self.summary=QLabel('No preview loaded'); self.summary.setWordWrap(True); layout.addWidget(self.summary); self.filter=QLineEdit(); self.filter.setPlaceholderText('Filter sample ticker'); layout.addWidget(self.filter)
+        controls=QHBoxLayout(); self.run=QPushButton('Preview sample results'); self.run.clicked.connect(self.preview); controls.addWidget(self.run); self.live=QPushButton('Run live screener'); self.live.clicked.connect(self.run_live); controls.addWidget(self.live); cancel=QPushButton('Cancel — not available'); cancel.setEnabled(False); controls.addWidget(cancel); layout.addLayout(controls)
+        self.summary=QLabel('No preview loaded'); self.summary.setWordWrap(True); layout.addWidget(self.summary); self.filter=QLineEdit(); self.filter.setPlaceholderText('Filter ticker'); layout.addWidget(self.filter)
         self.model=QStandardItemModel(0,10,self); self.model.setHorizontalHeaderLabels(['Ticker','Close ($)','Gain (%)','Score / 5','MACD','Histogram','Rising days','RSI','RVOL','Median dollar volume']); self.proxy=QSortFilterProxyModel(self); self.proxy.setSourceModel(self.model); self.proxy.setSortRole(Qt.ItemDataRole.UserRole); self.proxy.setFilterKeyColumn(0); self.proxy.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive); self.filter.textChanged.connect(self.proxy.setFilterFixedString)
-        self.table=QTableView(); self.table.setModel(self.proxy); self.table.setSortingEnabled(True); self.table.setAlternatingRowColors(True); self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows); self.table.setEditTriggers(QTableView.EditTrigger.NoEditTriggers); self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents); self.table.doubleClicked.connect(self.open_analysis); layout.addWidget(self.table,1); btn=QPushButton('Analyze selected sample'); btn.clicked.connect(lambda:self.open_analysis(self.table.currentIndex())); layout.addWidget(btn)
+        self.table=QTableView(); self.table.setModel(self.proxy); self.table.setSortingEnabled(True); self.table.setAlternatingRowColors(True); self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows); self.table.setEditTriggers(QTableView.EditTrigger.NoEditTriggers); self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents); self.table.doubleClicked.connect(self.open_analysis); layout.addWidget(self.table,1); btn=QPushButton('Analyze selected stock'); btn.clicked.connect(lambda:self.open_analysis(self.table.currentIndex())); layout.addWidget(btn)
     def preview(self):
+        self.live_matches=None; self.detail.setText('Select a sample from Stock Screener.')
         if self.minimum.value()>self.maximum.value(): self.summary.setText('Invalid price range: minimum exceeds maximum.'); self.model.removeRows(0,self.model.rowCount()); return
         self.model.removeRows(0,self.model.rowCount())
         for r in ROWS:
@@ -49,7 +51,38 @@ class Window(QMainWindow):
             self.model.appendRow(items)
         self.summary.setText('Strict Mode preview unavailable until engine integration.' if self.mode.currentIndex()==1 else f'{self.model.rowCount()} fictional sample matches — not a real scan.'); self.table.sortByColumn(3,Qt.SortOrder.DescendingOrder)
     def make_analysis(self):
-        _,layout=self.page(NAMES[1]); self.detail=QLabel('Select a sample from Stock Screener.'); self.detail.setWordWrap(True); self.detail.setTextFormat(Qt.TextFormat.PlainText); layout.addWidget(self.detail); layout.addWidget(QLabel('Price and indicator charts: scheduled for Milestone 08.')); layout.addStretch()
+        _,layout=self.page(NAMES[1]); self.detail=QLabel('Select a stock from Stock Screener.'); self.detail.setWordWrap(True); self.detail.setTextFormat(Qt.TextFormat.PlainText); layout.addWidget(self.detail); layout.addWidget(QLabel('Price and indicator charts: scheduled for Milestone 08.')); layout.addStretch()
     def open_analysis(self,index):
         if not index.isValid(): return
-        ticker=self.proxy.index(index.row(),0).data(); r=next(x for x in ROWS if x[0]==ticker); labels=['MACD > 0','Histogram > 0','At least 3 consecutive histogram increases','RSI 50–70 inclusive','RVOL > 1']; self.detail.setText(f'{ticker} — fictional sample\nClose ${r[1]:.2f} | Gain {r[2]}% | Score {sum(conditions(r))}/5\n\n'+'\n'.join(f'{label}: {value} — {int(ok)} point' for label,value,ok in zip(labels,r[3:8],conditions(r)))+f'\n\nMedian daily dollar volume: ${r[8]:,}'); self.nav.setCurrentRow(1)
+        ticker=self.proxy.index(index.row(),0).data()
+        if self.live_matches is not None:
+            m=self.live_matches[ticker]; score=m.technical_score; vals=display_row(m)
+            labels=['MACD > 0','Histogram > 0','At least 3 consecutive histogram increases','RSI 50–70 inclusive','RVOL > 1']
+            lines=[]
+            for label,value,flag in zip(labels,vals[4:9],score.conditions.values()):
+                n=number(value); lines.append(f'{label}: {"N/A" if n is None else format(n,".6g")} — {"N/A" if flag is None else int(flag)} point')
+            self.detail.setText(f'{ticker} — live scan, session {self.session_date}\nClose ${m.last_close:.2f} | Gain {m.gain_pct:.4f}% | Score {score.label}\n\n'+'\n'.join(lines)); self.nav.setCurrentRow(1); return
+        r=next(x for x in ROWS if x[0]==ticker); labels=['MACD > 0','Histogram > 0','At least 3 consecutive histogram increases','RSI 50–70 inclusive','RVOL > 1']; self.detail.setText(f'{ticker} — fictional sample\nClose ${r[1]:.2f} | Gain {r[2]}% | Score {sum(conditions(r))}/5\n\n'+'\n'.join(f'{label}: {value} — {int(ok)} point' for label,value,ok in zip(labels,r[3:8],conditions(r)))+f'\n\nMedian daily dollar volume: ${r[8]:,}'); self.nav.setCurrentRow(1)
+
+    def run_live(self):
+        try: request=ScreeningRequest(self.minimum.value(),self.maximum.value(),self.gain.value(),self.mode.currentIndex()==1)
+        except ValueError as exc: self.summary.setText(str(exc)); return
+        if QMessageBox.question(self,'Live screening','This scans the full Nasdaq directory. The window will be unresponsive during this operation; progress appears in the terminal. Background processing and cancellation arrive in Step 7. Continue?') != QMessageBox.StandardButton.Yes: return
+        self.live_matches={}; self.model.removeRows(0,self.model.rowCount()); self.detail.setText('No current result'); self.filter.clear(); self.summary.setText('Live scan running — see terminal for progress.'); self.statusBar().showMessage('Scanning — synchronous'); self.live.setEnabled(False); self.run.setEnabled(False); self.repaint(); self.summary.repaint()
+        try:
+            dates,result,matches=screen(request); self.show_live(dates,result,matches)
+        except Exception as exc:
+            self.model.removeRows(0,self.model.rowCount()); self.live_matches={}; self.summary.setText('Scan failed: '+str(exc)); self.statusBar().showMessage('Scan failed'); QMessageBox.warning(self,'Screening failed',str(exc))
+        finally: self.live.setEnabled(True); self.run.setEnabled(True)
+    def show_live(self,dates,result,matches):
+        self.session_date=dates[-1]; self.live_matches={m.security.ticker:m for m in matches}; self.model.removeRows(0,self.model.rowCount()); self.table.setSortingEnabled(False)
+        for m in matches:
+            items=[]
+            for i,v in enumerate(display_row(m)):
+                n=number(v) if i else None
+                text=str(v) if i==0 else ('N/A' if n is None else (str(int(n)) if i in (3,6) else format(n,'.10g')))
+                item=QStandardItem(text); item.setData(v if i==0 else (n if n is not None else float('-inf')),Qt.ItemDataRole.UserRole); items.append(item)
+            self.model.appendRow(items)
+        self.proxy.sort(-1); self.table.horizontalHeader().setSortIndicator(-1,Qt.SortOrder.AscendingOrder); self.table.setSortingEnabled(True)
+        self.summary.setText(f'Completed sessions {dates[0]} to {dates[-1]} | Checked {result.checked} | Qualified {len(matches)} | Incomplete prices {result.missing} | Reverse splits {result.excluded_reverse} | Unverified splits {result.excluded_unverified} | Momentum exclusions {result.excluded_momentum}')
+        self.statusBar().showMessage('Scan complete | Database not connected')
