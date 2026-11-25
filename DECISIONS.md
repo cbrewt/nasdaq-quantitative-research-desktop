@@ -711,3 +711,8 @@ Approved November 25, 2026: design/approval, implementation/testing, acceptance.
 ## DBD-001 - Database design approval
 
 Approved November 25, 2026. Dedicated MySQL schema, fourteen tables, migration 001, restricted loopback account, initial backup and recovery verified. See docs/database/VERIFICATION.md.
+
+
+## UID-001 - User interface design approval
+
+Approved November 25, 2026 under DEV-002. Dark resizable desktop interface, six workspaces, persistent sidebar and approved interaction standards. See docs/UID-001_INTERFACE_DESIGN.md. Prototype implementation requires separate Milestone 05 authorization.

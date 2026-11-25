@@ -403,3 +403,14 @@ DBD-001 approved and installed. Schema, synthetic transaction tests, least-privi
 User acceptance: "I formally accept Development Step 3. Consolidate the documentation and Git commit, then proceed with Development Step 4 under DEV-002."
 
 Milestone 04 authorized; UI design approval required before prototype implementation.
+
+
+## Milestone 04 - User Interface Design
+
+Status: DESIGN APPROVED - FORMAL MILESTONE ACCEPTANCE PENDING
+
+Approval date: November 25, 2026
+
+User approval: "I approve UID-001. Proceed with completing Development Step 4 under DEV-002."
+
+Design specification: docs/UID-001_INTERFACE_DESIGN.md. Implementation and runtime testing are deferred to the authorized downstream milestones. Milestone 05 not yet authorized.
