@@ -436,3 +436,11 @@ November 25, 2026: User formally accepted Development Step 6 and authorized Step
 ## Milestone 07 - Background Processing
 
 Implementation and automated verification in progress; formal acceptance pending.
+
+## Milestone 07 - Formal acceptance
+
+November 25, 2026: User formally accepted background processing and authorized Step 8 under DEV-002. Windows progress, responsiveness, cancellation, restart and completion verified.
+
+## Milestone 08 - Technical Analysis Visualization
+
+Implementation and verification in progress; formal acceptance pending.

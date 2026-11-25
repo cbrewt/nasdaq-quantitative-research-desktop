@@ -3,7 +3,8 @@ from ..application.screening import ScreeningRequest, screen, screen_background,
 from threading import Event
 from PySide6.QtCore import Qt, QSortFilterProxyModel, QRegularExpression, QObject, QThread, Signal, Slot
 from PySide6.QtGui import QStandardItemModel, QStandardItem
-from PySide6.QtWidgets import (QMainWindow,QWidget,QVBoxLayout,QHBoxLayout,QFormLayout,QLabel,QPushButton,QListWidget,QStackedWidget,QDoubleSpinBox,QComboBox,QLineEdit,QTableView,QHeaderView,QMessageBox,QGroupBox,QApplication,QProgressBar)
+from PySide6.QtWidgets import (QMainWindow,QWidget,QVBoxLayout,QHBoxLayout,QFormLayout,QLabel,QPushButton,QListWidget,QStackedWidget,QDoubleSpinBox,QComboBox,QLineEdit,QTableView,QHeaderView,QMessageBox,QGroupBox,QApplication,QProgressBar,QScrollArea)
+from .charts import Chart, PANELS, extract
 
 NAMES = ['Stock Screener','Stock Analysis','Backtesting','Research History','Reports','Settings']
 # Fictional measurements, not calculated by the Version 1.2 engine.
@@ -82,7 +83,7 @@ class Window(QMainWindow):
         self.model=QStandardItemModel(0,10,self); self.model.setHorizontalHeaderLabels(['Ticker','Close ($)','Gain (%)','Score / 5','MACD','Histogram','Rising days','RSI','RVOL','Median dollar volume']); self.proxy=QSortFilterProxyModel(self); self.proxy.setSourceModel(self.model); self.proxy.setSortRole(Qt.ItemDataRole.UserRole); self.proxy.setFilterKeyColumn(0); self.proxy.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive); self.filter.textChanged.connect(self.proxy.setFilterFixedString)
         self.table=QTableView(); self.table.setModel(self.proxy); self.table.setSortingEnabled(True); self.table.setAlternatingRowColors(True); self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows); self.table.setEditTriggers(QTableView.EditTrigger.NoEditTriggers); self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents); self.table.doubleClicked.connect(self.open_analysis); layout.addWidget(self.table,1); btn=QPushButton('Analyze selected stock'); btn.clicked.connect(lambda:self.open_analysis(self.table.currentIndex())); layout.addWidget(btn)
     def preview(self):
-        self.live_matches=None; self.detail.setText('Select a sample from Stock Screener.')
+        self.clear_charts(); self.live_matches=None; self.detail.setText('Select a sample from Stock Screener.')
         if self.minimum.value()>self.maximum.value(): self.summary.setText('Invalid price range: minimum exceeds maximum.'); self.model.removeRows(0,self.model.rowCount()); return
         self.model.removeRows(0,self.model.rowCount())
         for r in ROWS:
@@ -95,7 +96,18 @@ class Window(QMainWindow):
             self.model.appendRow(items)
         self.summary.setText('Strict Mode preview unavailable until engine integration.' if self.mode.currentIndex()==1 else f'{self.model.rowCount()} fictional sample matches — not a real scan.'); self.table.sortByColumn(3,Qt.SortOrder.DescendingOrder)
     def make_analysis(self):
-        _,layout=self.page(NAMES[1]); self.detail=QLabel('Select a stock from Stock Screener.'); self.detail.setWordWrap(True); self.detail.setTextFormat(Qt.TextFormat.PlainText); layout.addWidget(self.detail); layout.addWidget(QLabel('Price and indicator charts: scheduled for Milestone 08.')); layout.addStretch()
+        _,layout=self.page(NAMES[1]); scroll=QScrollArea(); scroll.setWidgetResizable(True); content=QWidget(); inner=QVBoxLayout(content); scroll.setWidget(content); layout.addWidget(scroll,1)
+        self.detail=QLabel('Select a stock from Stock Screener.'); self.detail.setWordWrap(True); self.detail.setTextFormat(Qt.TextFormat.PlainText); inner.addWidget(self.detail)
+        self.chart_note=QLabel('Charts require a completed live scan.'); self.chart_note.setWordWrap(True); inner.addWidget(self.chart_note)
+        self.charts=[Chart(panel) for panel in PANELS]
+        for chart in self.charts: inner.addWidget(chart); chart.hide()
+        inner.addStretch()
+    def clear_charts(self):
+        self.chart_note.setText('Charts require a completed live scan; sample rows have no historical series.')
+        for chart in self.charts: chart.set_data([],{}); chart.hide()
+    def show_charts(self,match):
+        dates,values=extract(match.daily); self.chart_note.setText('Recorded completed-session observations from this scan. Missing values are gaps; no additional data requested.')
+        for chart in self.charts: chart.set_data(dates,values); chart.show()
     def open_analysis(self,index):
         if not index.isValid(): return
         ticker=self.proxy.index(index.row(),0).data()
@@ -105,8 +117,8 @@ class Window(QMainWindow):
             lines=[]
             for label,value,flag in zip(labels,vals[4:9],score.conditions.values()):
                 n=number(value); lines.append(f'{label}: {"N/A" if n is None else format(n,".6g")} — {"N/A" if flag is None else int(flag)} point')
-            self.detail.setText(f'{ticker} — live scan, session {self.session_date}\nClose ${m.last_close:.2f} | Gain {m.gain_pct:.4f}% | Score {score.label}\n\n'+'\n'.join(lines)); self.nav.setCurrentRow(1); return
-        r=next(x for x in ROWS if x[0]==ticker); labels=['MACD > 0','Histogram > 0','At least 3 consecutive histogram increases','RSI 50–70 inclusive','RVOL > 1']; self.detail.setText(f'{ticker} — fictional sample\nClose ${r[1]:.2f} | Gain {r[2]}% | Score {sum(conditions(r))}/5\n\n'+'\n'.join(f'{label}: {value} — {int(ok)} point' for label,value,ok in zip(labels,r[3:8],conditions(r)))+f'\n\nMedian daily dollar volume: ${r[8]:,}'); self.nav.setCurrentRow(1)
+            self.detail.setText(f'{ticker} — live scan, session {self.session_date}\nClose ${m.last_close:.2f} | Gain {m.gain_pct:.4f}% | Score {score.label}\n\n'+'\n'.join(lines)); self.show_charts(m); self.nav.setCurrentRow(1); return
+        self.clear_charts(); r=next(x for x in ROWS if x[0]==ticker); labels=['MACD > 0','Histogram > 0','At least 3 consecutive histogram increases','RSI 50–70 inclusive','RVOL > 1']; self.detail.setText(f'{ticker} — fictional sample\nClose ${r[1]:.2f} | Gain {r[2]}% | Score {sum(conditions(r))}/5\n\n'+'\n'.join(f'{label}: {value} — {int(ok)} point' for label,value,ok in zip(labels,r[3:8],conditions(r)))+f'\n\nMedian daily dollar volume: ${r[8]:,}'); self.nav.setCurrentRow(1)
 
     def run_live(self):
         if self._thread is not None: return
@@ -117,7 +129,7 @@ class Window(QMainWindow):
 
     def start_scan(self, request):
         if self._thread is not None: return
-        self.live_matches={}; self.model.removeRows(0,self.model.rowCount()); self.detail.setText('No current result'); self.filter.clear()
+        self.clear_charts(); self.live_matches={}; self.model.removeRows(0,self.model.rowCount()); self.detail.setText('No current result'); self.filter.clear()
         self.summary.setText('Starting live scan'); self.statusBar().showMessage('Scanning in background'); self.progress.setRange(0,0)
         for control in (self.live,self.run,self.minimum,self.maximum,self.gain,self.mode): control.setEnabled(False)
         self.cancel.setEnabled(True)
