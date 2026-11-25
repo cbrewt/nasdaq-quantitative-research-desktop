@@ -372,3 +372,333 @@ ADR-002 remains in force.
 
 ADR-015 supplements the original baseline protection
 decision without superseding its requirements.
+
+
+## ADR-016 - Modular Layered Monolithic Architecture
+
+Date: November 25, 2026
+
+Status: APPROVED
+Implementation: PENDING
+
+Decision:
+
+Adopt a modular, layered monolithic architecture
+consisting of presentation, application,
+quantitative domain and infrastructure layers.
+
+Rationale:
+
+Separate responsibilities while minimizing
+unnecessary implementation complexity.
+
+Consequences:
+
+Presentation shall not implement quantitative
+formulas or SQL queries.
+
+The quantitative domain shall remain independent
+of presentation and infrastructure implementations.
+
+Reference: ARCH-001.
+
+
+## ADR-017 - Python Source Package Organization
+
+Date: November 25, 2026
+
+Status: APPROVED
+Implementation: PENDING
+
+Decision:
+
+Adopt a src-based Python package structure using
+nasdaq_research as the primary application package.
+
+Maintain separate source, test, documentation
+and database migration directories.
+
+Rationale:
+
+Improve maintainability, import organization
+and independent component testing.
+
+Consequences:
+
+Establish an explicit application launch and
+import-resolution strategy without introducing
+unapproved dependencies.
+
+Create application modules incrementally within
+their authorized development milestones.
+
+References: ARCH-001 and AQ-001.
+
+
+## ADR-018 - Quantitative Engine Preservation
+
+Date: November 25, 2026
+
+Status: APPROVED
+Implementation: PENDING
+
+Decision:
+
+Reuse the validated Version 1.2 research engine
+through controlled adaptation rather than rewriting
+established quantitative methodologies.
+
+Adopt all sixteen QPC-001 preservation requirements.
+
+Rationale:
+
+Protect mathematical integrity and maintain
+consistent quantitative research behavior.
+
+Consequences:
+
+Preserve existing indicator calculations,
+screening rules, technical scoring, simulation
+and statistical performance methodologies.
+
+Compare Version 1.2 and Version 2.0 using
+identical deterministic market data.
+
+Quantitative methodology changes require
+explicit user approval.
+
+References: ADR-015, ARCH-001 and QPC-001.
+
+
+## ADR-019 - Shared Application Services
+
+Date: November 25, 2026
+
+Status: APPROVED
+Implementation: PENDING
+
+Decision:
+
+Establish shared application services accessible
+to both graphical and command-line interfaces.
+
+Rationale:
+
+Avoid duplicate research implementations and
+preserve command-line functionality.
+
+Consequences:
+
+Application services shall coordinate screening,
+historical simulation, research history and
+report generation.
+
+Presentation components shall interact with
+research services through defined interfaces.
+
+Reference: ARCH-001.
+
+
+## ADR-020 - External Provider Interfaces
+
+Date: November 25, 2026
+
+Status: APPROVED
+Implementation: PENDING
+
+Decision:
+
+Separate external market data and security
+directory acquisition from quantitative
+calculations through defined provider interfaces.
+
+Rationale:
+
+Improve component testability and isolate
+external service dependencies.
+
+Consequences:
+
+Preserve existing market data acquisition,
+validation and exclusion behavior.
+
+Support deterministic test data substitution.
+
+Do not silently change market data sources
+or quantitative methodology.
+
+References: ARCH-001, QPC-001 and DIC-001.
+
+
+## ADR-021 - MySQL Repository Architecture
+
+Date: November 25, 2026
+
+Status: APPROVED
+Implementation: PENDING
+
+Decision:
+
+Use the Repository Pattern with explicit,
+parameterized SQL and MySQL Connector/Python.
+
+Do not introduce an ORM framework.
+
+Rationale:
+
+Provide direct control over relational integrity,
+SQL execution, database transactions and indexes.
+
+Consequences:
+
+Database access shall remain within
+the infrastructure layer.
+
+Use a dedicated research database, restricted
+database privileges, external credential storage
+and version-controlled schema migrations.
+
+Physical database schema approval remains
+a separate requirement of Milestone 03.
+
+References: ARCH-001 and DIC-001.
+
+
+## ADR-022 - Qt Background Processing
+
+Date: November 25, 2026
+
+Status: APPROVED
+Implementation: PENDING
+
+Decision:
+
+Use PySide6 QObject workers, QThread and Qt
+signals for long-running research operations.
+
+Rationale:
+
+Maintain graphical interface responsiveness
+during screening and historical analysis.
+
+Consequences:
+
+Use cooperative cancellation and thread-safe
+communication between workers and the GUI.
+
+Cancellation must remain accessible while
+a worker is busy.
+
+A queued Qt cancellation signal alone may
+be insufficient.
+
+Do not forcibly terminate active research threads.
+
+References: ARCH-001 and AQ-002.
+
+
+## ADR-023 - Research Identity and Reproducibility
+
+Date: November 25, 2026
+
+Status: APPROVED
+Implementation: PENDING
+
+Decision:
+
+Preserve unique research-run identities,
+research parameters, relevant original source
+inputs and quantitative engine revisions.
+
+Adopt all twelve DIC-001 requirements.
+
+Rationale:
+
+Support research traceability, data integrity
+and historical reproducibility.
+
+Consequences:
+
+Distinguish execution timestamps from
+completed trading dates.
+
+Associate research results, historical signals,
+simulated trades and reports with their
+originating research executions.
+
+Preserve the actual relevant calculation inputs,
+not merely provider names, dates and parameters.
+
+Physical storage and retention requirements
+remain subject to database design review.
+
+References: ARCH-001, DIC-001 and AQ-003.
+
+
+## ADR-024 - Centralized Configuration and Paths
+
+Date: November 25, 2026
+
+Status: APPROVED
+Implementation: PENDING
+
+Decision:
+
+Centralize application configuration and
+operational path management.
+
+Rationale:
+
+Reduce filesystem coupling and protect
+credentials and operational data.
+
+Consequences:
+
+Separate generated research files, reports,
+configuration and credentials from source code.
+
+Database credentials shall not be committed
+to Git or embedded within application source.
+
+Protected Version 1.2 archives shall remain
+outside the active development directory.
+
+Reference: ARCH-001.
+
+
+## ADR-025 - Failure Isolation and Testing
+
+Date: November 25, 2026
+
+Status: APPROVED
+Implementation: PENDING
+
+Decision:
+
+Preserve successful primary research results
+when secondary workflow operations fail.
+
+Require systematic automated verification
+throughout the approved development roadmap.
+
+Rationale:
+
+Protect research integrity and prevent
+secondary failures from discarding valid results.
+
+Consequences:
+
+Report database persistence and report-generation
+failures accurately.
+
+Represent cancellation explicitly.
+
+Preserve the existing thirty-four offline tests
+and extend coverage through unit, integration,
+regression, database, GUI, security, performance,
+backup and deployment testing.
+
+Comprehensive quantitative equivalence requires
+separate implementation verification.
+
+References: ARCH-001, QPC-001 and DIC-001.

@@ -165,3 +165,210 @@ Milestone 02 status: NOT AUTHORIZED
 
 Development shall remain paused until explicit
 authorization to commence Milestone 02 is received.
+
+
+---
+
+## Milestone 02 - Source Code Audit and Application Architecture
+
+Commencement date: November 25, 2026
+
+Architecture approval date: November 25, 2026
+
+Status: ARCHITECTURE APPROVED - FINAL VERIFICATION PENDING
+
+Formal milestone acceptance: Pending
+
+### Milestone objective
+
+Audit the validated Version 1.2 research engine
+and establish an approved modular architecture
+for the Version 2.0 desktop application.
+
+### Development substeps
+
+- 2.1 Validated source acquisition and verification: PASS
+- 2.2 Source code inventory: COMPLETE
+- 2.3 Dependency and coupling analysis: COMPLETE
+- 2.4 Quantitative research engine audit: COMPLETE
+- 2.5 Data flow and interface analysis: COMPLETE
+- 2.6 Desktop application architecture: COMPLETE
+- 2.7 Architecture review and approval: APPROVED
+- 2.8 Final documentation and milestone acceptance:
+  In progress.
+
+### Audited source baseline
+
+Archive:
+Nasdaq_Quant_Research_V1_2_Validated_Source.zip
+
+SHA-256:
+71ec91441fe26f35e34534b5e758c01a4b8aacf2e75938aa156a4f78ef457909
+
+Python source files: 29
+
+Baseline selection: ADR-015
+
+The validated source remains the authoritative
+reference for quantitative regression testing.
+
+### Source audit scope
+
+- Source file inventory.
+- Internal and external dependencies.
+- Module responsibilities and coupling.
+- Screening and qualification methodology.
+- Technical indicator calculations.
+- Five-point technical scoring.
+- Historical simulation methodology.
+- Statistical performance calculations.
+- Application data structures and interfaces.
+- JSON handoff compatibility.
+- Research integrity limitations.
+
+The audit was performed through static source
+inspection rather than new application execution.
+
+### Approved desktop architecture
+
+Architecture reference: ARCH-001
+
+Approved architecture:
+Modular, layered monolithic architecture.
+
+Application layers:
+
+1. Presentation.
+2. Application.
+3. Quantitative domain.
+4. Infrastructure.
+
+Preserve command-line compatibility and maintain
+one authoritative quantitative research engine.
+
+Use the approved src-based package organization,
+application services, provider interfaces and
+MySQL repository architecture.
+
+### Approved architectural decisions
+
+- ADR-016: Modular layered monolithic architecture.
+- ADR-017: Python source package organization.
+- ADR-018: Quantitative engine preservation.
+- ADR-019: Shared application services.
+- ADR-020: External provider interfaces.
+- ADR-021: MySQL repository architecture.
+- ADR-022: Qt background processing.
+- ADR-023: Research identity and reproducibility.
+- ADR-024: Centralized configuration and paths.
+- ADR-025: Failure isolation and testing.
+
+New architectural decisions: 10
+Total architectural decisions: 25
+
+Implementation status: PENDING
+
+### Approved architectural qualifications
+
+AQ-001:
+Establish explicit application launch and
+import-resolution behavior without introducing
+unapproved dependencies.
+
+AQ-002:
+Use a thread-safe cooperative cancellation
+mechanism accessible while workers are busy.
+
+AQ-003:
+Preserve actual relevant research inputs
+required for reproducibility.
+
+### Approved preservation contracts
+
+QPC-001:
+Quantitative Preservation Contract.
+
+Approved requirements: 16
+
+DIC-001:
+Data Interface Contract.
+
+Approved requirements: 12
+
+Total preservation requirements: 28
+
+The contracts were formally approved by the user
+on November 25, 2026.
+
+### Technical documentation
+
+docs/SOURCE_AUDIT.md
+Reference: AUDIT-001
+
+docs/ARCHITECTURE.md
+Reference: ARCH-001
+
+docs/QUANTITATIVE_CONTRACT.md
+Reference: QPC-001
+
+docs/DATA_INTERFACE_CONTRACT.md
+Reference: DIC-001
+
+All four documents have been created.
+
+Final content review and Git verification
+remain pending.
+
+### Existing regression evidence
+
+Step 6 offline tests: 16 of 16 passed.
+Step 7 offline tests: 18 of 18 passed.
+Combined tests: 34 of 34 passed.
+
+These results were established during Milestone 01
+and apply to the validated Version 1.2 baseline.
+
+No new runtime test execution is claimed
+for Milestone 02.
+
+### Outstanding limitations
+
+The approved architecture has not yet been
+implemented or tested.
+
+MySQL server connectivity remains unverified.
+
+The physical database schema and graphical
+interface design remain pending.
+
+Comprehensive quantitative equivalence testing
+and live market data verification remain pending.
+
+The existing historical research methodology
+retains present-day candidate selection bias.
+
+### Baseline protection and scope control
+
+No quantitative methodology changes or
+additional dependencies were authorized.
+
+The original Version 1.2 application and both
+protected archives shall remain unchanged.
+
+The approved twelve-milestone roadmap and
+its definitive endpoint remain unchanged.
+
+### Remaining milestone closure activities
+
+- Complete technical documentation review.
+- Verify documentation integrity.
+- Commit and verify documentation in Git.
+- Obtain formal user acceptance.
+- Record milestone acceptance.
+
+### Next planned development milestone
+
+Milestone 03 - MySQL Database Design
+
+Commencement requires formal acceptance of
+Milestone 02 and explicit user authorization.
