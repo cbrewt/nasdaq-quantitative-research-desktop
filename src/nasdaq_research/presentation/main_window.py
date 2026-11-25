@@ -5,6 +5,11 @@ from PySide6.QtCore import Qt, QSortFilterProxyModel, QRegularExpression, QObjec
 from PySide6.QtGui import QStandardItemModel, QStandardItem
 from PySide6.QtWidgets import (QMainWindow,QWidget,QVBoxLayout,QHBoxLayout,QFormLayout,QLabel,QPushButton,QListWidget,QStackedWidget,QDoubleSpinBox,QComboBox,QLineEdit,QTableView,QHeaderView,QMessageBox,QGroupBox,QApplication,QProgressBar,QScrollArea)
 from .charts import Chart, PANELS, extract
+from ..application.historical import export_scan, historical
+from pathlib import Path
+from PySide6.QtWidgets import QFileDialog, QSpinBox
+from PySide6.QtCore import QUrl
+from PySide6.QtGui import QDesktopServices
 
 NAMES = ['Stock Screener','Stock Analysis','Backtesting','Research History','Reports','Settings']
 # Fictional measurements, not calculated by the Version 1.2 engine.
@@ -54,6 +59,18 @@ class ScanWorker(QObject):
         finally:
             self.finished.emit()
 
+class HistoricalWorker(QObject):
+    succeeded=Signal(object,object)
+    failed=Signal(str)
+    finished=Signal()
+    def __init__(self,h,report):
+        super().__init__(); self.h=h; self.report=report
+    @Slot()
+    def run(self):
+        try: self.succeeded.emit(*historical(self.h,self.report))
+        except Exception as exc: self.failed.emit(str(exc))
+        finally: self.finished.emit()
+
 class Window(QMainWindow):
     def __init__(self):
         super().__init__(); self.setWindowTitle('Nasdaq Quantitative Research V2.0 — Prototype'); self.resize(1280,800); self.setMinimumSize(800,560)
@@ -62,9 +79,10 @@ class Window(QMainWindow):
         banner=QLabel('LIVE SCREENING • Sample preview available • Database not connected'); banner.setStyleSheet('background:#4b3821;color:#ffe3b0;padding:10px;font-weight:bold'); outer.addWidget(banner)
         body=QHBoxLayout(); outer.addLayout(body,1); self.nav=QListWidget(); self.nav.addItems(NAMES); self.nav.setFixedWidth(215); body.addWidget(self.nav); self.stack=QStackedWidget(); body.addWidget(self.stack,1)
         self.nav.currentRowChanged.connect(self.stack.setCurrentIndex)
-        self._thread=None; self._worker=None; self._token=None; self.live_matches=None; self.make_screener(); self.make_analysis()
-        for name,description in [('Backtesting','Historical simulation, signals, trades and statistics — integration in Milestone 09.'),('Research History','Saved research runs and parameters — database integration in Milestone 10.'),('Reports','Word report generation and retrieval — integration in Milestone 09.'),('Settings','Application and database configuration — not connected. No credentials are requested or stored.')]:
+        self._thread=None; self._worker=None; self._token=None; self.live_matches=None; self.snapshot=None; self._history_thread=None; self.make_screener(); self.make_analysis(); self.make_backtesting()
+        for name,description in [('Research History','Saved research runs and parameters — database integration in Milestone 10.'),('Settings','Application and database configuration — not connected. No credentials are requested or stored.')]:
             _,layout=self.page(name); label=QLabel(description); label.setWordWrap(True); layout.addWidget(label); layout.addStretch()
+            if name=='Research History': self.make_reports()
         for name in ['File','Research','View','Tools','Help']:
             menu=self.menuBar().addMenu(name)
             if name=='File': menu.addAction('Exit',self.close)
@@ -83,7 +101,7 @@ class Window(QMainWindow):
         self.model=QStandardItemModel(0,10,self); self.model.setHorizontalHeaderLabels(['Ticker','Close ($)','Gain (%)','Score / 5','MACD','Histogram','Rising days','RSI','RVOL','Median dollar volume']); self.proxy=QSortFilterProxyModel(self); self.proxy.setSourceModel(self.model); self.proxy.setSortRole(Qt.ItemDataRole.UserRole); self.proxy.setFilterKeyColumn(0); self.proxy.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive); self.filter.textChanged.connect(self.proxy.setFilterFixedString)
         self.table=QTableView(); self.table.setModel(self.proxy); self.table.setSortingEnabled(True); self.table.setAlternatingRowColors(True); self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows); self.table.setEditTriggers(QTableView.EditTrigger.NoEditTriggers); self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents); self.table.doubleClicked.connect(self.open_analysis); layout.addWidget(self.table,1); btn=QPushButton('Analyze selected stock'); btn.clicked.connect(lambda:self.open_analysis(self.table.currentIndex())); layout.addWidget(btn)
     def preview(self):
-        self.clear_charts(); self.live_matches=None; self.detail.setText('Select a sample from Stock Screener.')
+        self.snapshot=None; self.clear_charts(); self.live_matches=None; self.detail.setText('Select a sample from Stock Screener.')
         if self.minimum.value()>self.maximum.value(): self.summary.setText('Invalid price range: minimum exceeds maximum.'); self.model.removeRows(0,self.model.rowCount()); return
         self.model.removeRows(0,self.model.rowCount())
         for r in ROWS:
@@ -128,7 +146,8 @@ class Window(QMainWindow):
         self.start_scan(request)
 
     def start_scan(self, request):
-        if self._thread is not None: return
+        if self._thread is not None or self._history_thread is not None: return
+        self.snapshot=None; self.scan_request=request
         self.clear_charts(); self.live_matches={}; self.model.removeRows(0,self.model.rowCount()); self.detail.setText('No current result'); self.filter.clear()
         self.summary.setText('Starting live scan'); self.statusBar().showMessage('Scanning in background'); self.progress.setRange(0,0)
         for control in (self.live,self.run,self.minimum,self.maximum,self.gain,self.mode): control.setEnabled(False)
@@ -158,7 +177,7 @@ class Window(QMainWindow):
     @Slot(object,object,object)
     def scan_succeeded(self,dates,result,matches):
         if self._token is not None and self._token.is_set(): self.scan_cancelled(); return
-        self.show_live(dates,result,matches); self.progress.setRange(0,100); self.progress.setValue(100); self.cancel.setEnabled(False)
+        self.snapshot=(self.scan_request,tuple(dates),result,tuple(matches)); self.show_live(dates,result,matches); self.progress.setRange(0,100); self.progress.setValue(100); self.cancel.setEnabled(False)
 
     @Slot(str)
     def scan_failed(self,message):
@@ -175,6 +194,8 @@ class Window(QMainWindow):
         self.cancel.setEnabled(False)
 
     def closeEvent(self,event):
+        if self._history_thread is not None:
+            event.ignore(); self.statusBar().showMessage('Historical simulation still running'); return
         if self._thread is not None:
             self.cancel_scan(); event.ignore(); self.statusBar().showMessage('Cancellation requested; close again after scan stops')
         else: super().closeEvent(event)
@@ -191,3 +212,49 @@ class Window(QMainWindow):
         self.proxy.sort(-1); self.table.horizontalHeader().setSortIndicator(-1,Qt.SortOrder.AscendingOrder); self.table.setSortingEnabled(True)
         self.summary.setText(f'Completed sessions {dates[0]} to {dates[-1]} | Checked {result.checked} | Qualified {len(matches)} | Incomplete prices {result.missing} | Reverse splits {result.excluded_reverse} | Unverified splits {result.excluded_unverified} | Momentum exclusions {result.excluded_momentum}')
         self.statusBar().showMessage('Scan complete | Database not connected')
+
+    def make_backtesting(self):
+        _,layout=self.page('Backtesting'); form=QFormLayout(); layout.addLayout(form)
+        self.years=QSpinBox(); self.years.setRange(1,10); self.years.setValue(2)
+        self.holding=QSpinBox(); self.holding.setRange(1,250); self.holding.setValue(5)
+        self.cost=QDoubleSpinBox(); self.cost.setRange(0,100); self.cost.setValue(.5); self.cost.setSuffix('%')
+        for label,widget in [('History years',self.years),('Holding sessions',self.holding),('Round-trip cost',self.cost)]: form.addRow(label,widget)
+        note=QLabel('Uses the last completed live scan and its original settings. Current candidate selection introduces survivorship and selection bias; not a point-in-time universe backtest.'); note.setWordWrap(True); layout.addWidget(note)
+        self.backtest_button=QPushButton('Run historical simulation'); self.backtest_button.clicked.connect(self.start_history); layout.addWidget(self.backtest_button)
+        self.history_status=QLabel('Complete a live scan first.'); self.history_status.setWordWrap(True); layout.addWidget(self.history_status); layout.addStretch()
+    def make_reports(self):
+        _,layout=self.page('Reports'); self.report_status=QLabel('Reports are saved in a separate V2 research folder.'); self.report_status.setWordWrap(True); layout.addWidget(self.report_status)
+        self.export_button=QPushButton('Generate screening Word report'); self.export_button.clicked.connect(self.export_current); layout.addWidget(self.export_button)
+        btn=QPushButton('Open reports folder'); btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.reports_dir())))); layout.addWidget(btn); layout.addStretch()
+    def reports_dir(self):
+        folder=Path.home()/'Nasdaq_Quant_Research_V2_Reports'; folder.mkdir(exist_ok=True); return folder
+    def export_current(self):
+        if self.snapshot is None or self._thread is not None or self._history_thread is not None:
+            self.report_status.setText('A completed live scan is required.'); return
+        try:
+            h,report=export_scan(self.snapshot,self.reports_dir()); self.report_status.setText(str(report))
+        except Exception as exc: self.report_status.setText('Report failed: '+str(exc))
+    def start_history(self):
+        if self.snapshot is None or self._thread is not None or self._history_thread is not None:
+            self.history_status.setText('A completed live scan is required.'); return
+        if not self.snapshot[3]: self.history_status.setText('No qualifying tickers; simulation skipped.'); return
+        if QMessageBox.question(self,'Historical simulation','Run historical research for the completed scan? The interface remains responsive; cancellation is not yet available for this operation.') != QMessageBox.StandardButton.Yes: return
+        try:
+            h,report=export_scan(self.snapshot,self.reports_dir(),self.years.value(),self.holding.value(),self.cost.value())
+        except Exception as exc: self.history_status.setText('Export failed: '+str(exc)); return
+        self.report_status.setText(str(report)); self.history_status.setText('Historical simulation running…')
+        for control in (self.backtest_button,self.export_button,self.live,self.run): control.setEnabled(False)
+        self._history_thread=QThread(self); self._history_worker=HistoricalWorker(h,report); self._history_worker.moveToThread(self._history_thread)
+        self._history_thread.started.connect(self._history_worker.run); self._history_worker.succeeded.connect(self.history_done); self._history_worker.failed.connect(self.history_failed); self._history_worker.finished.connect(self._history_thread.quit); self._history_worker.finished.connect(self._history_worker.deleteLater); self._history_thread.finished.connect(self.history_finished); self._history_thread.finished.connect(self._history_thread.deleteLater); self._history_thread.start()
+    @Slot(object,object)
+    def history_done(self,result,path):
+        if result.backtest is None: self.history_status.setText('No historical simulation performed.'); return
+        sim=result.backtest.analysis.simulation
+        self.history_status.setText(f'Historical period: {result.start_date} through {result.end_date} | Signals: {sim.total_signals} | Completed trades: {len(sim.trades)}\nIntegrated report: {path}')
+        self.report_status.setText(str(path))
+    @Slot(str)
+    def history_failed(self,message): self.history_status.setText('Historical simulation/report failed: '+message+' — screening report retained.')
+    @Slot()
+    def history_finished(self):
+        self._history_thread=None; self._history_worker=None
+        for control in (self.backtest_button,self.export_button,self.live,self.run): control.setEnabled(True)

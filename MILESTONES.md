@@ -444,3 +444,11 @@ November 25, 2026: User formally accepted background processing and authorized S
 ## Milestone 08 - Technical Analysis Visualization
 
 Implementation and verification in progress; formal acceptance pending.
+
+## Milestone 08 - Formal acceptance
+
+November 25, 2026: User accepted technical visualization and authorized Step 9 under DEV-002. Six charts and stock selection verified.
+
+## Milestone 09 - Historical Simulation and Reporting
+
+Implementation and verification in progress; formal acceptance pending.
