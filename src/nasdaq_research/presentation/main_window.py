@@ -9,6 +9,23 @@ NAMES = ['Stock Screener','Stock Analysis','Backtesting','Research History','Rep
 ROWS = [('DEMO-A',4.82,18.4,0.182,0.046,3,63.4,1.84,1200000),('DEMO-B',7.25,15.2,0.11,0.02,2,58.1,1.56,950000),('DEMO-C',2.64,12.7,-0.03,0.01,3,72.1,1.21,640000),('DEMO-D',5.12,11.3,0.04,-0.01,0,54.2,0.92,420000)]
 def conditions(r):
     return (r[3]>0,r[4]>0,r[5]>=3,50<=r[6]<=70,r[7]>1)
+def display_text(column, value):
+    """Format display text only; preserve raw numbers in the model's sort role."""
+    if column == 0:
+        return str(value)
+    n = number(value)
+    if n is None:
+        return 'N/A'
+    if column in (3, 6):
+        return str(int(n))
+    if column == 9:
+        return f'{n:,.2f}'
+    places = 6 if column in (4, 5) else 2
+    text = format(n, f'.{places}f')
+    if n != 0 and float(text) == 0:
+        return format(n, '.3e')
+    return text
+
 class Window(QMainWindow):
     def __init__(self):
         super().__init__(); self.setWindowTitle('Nasdaq Quantitative Research V2.0 — Prototype'); self.resize(1280,800); self.setMinimumSize(800,560)
@@ -46,8 +63,8 @@ class Window(QMainWindow):
             # Strict-mode preview is deliberately disabled: actual strict rules require engine integration.
             if self.mode.currentIndex()==1: continue
             vals=(r[0],r[1],r[2],sum(conditions(r)),*r[3:]); items=[]
-            for v in vals:
-                item=QStandardItem(str(v)); item.setData(v,Qt.ItemDataRole.UserRole); items.append(item)
+            for i,v in enumerate(vals):
+                item=QStandardItem(display_text(i,v)); item.setData(v,Qt.ItemDataRole.UserRole); items.append(item)
             self.model.appendRow(items)
         self.summary.setText('Strict Mode preview unavailable until engine integration.' if self.mode.currentIndex()==1 else f'{self.model.rowCount()} fictional sample matches — not a real scan.'); self.table.sortByColumn(3,Qt.SortOrder.DescendingOrder)
     def make_analysis(self):
@@ -80,7 +97,7 @@ class Window(QMainWindow):
             items=[]
             for i,v in enumerate(display_row(m)):
                 n=number(v) if i else None
-                text=str(v) if i==0 else ('N/A' if n is None else (str(int(n)) if i in (3,6) else format(n,'.10g')))
+                text=display_text(i,v)
                 item=QStandardItem(text); item.setData(v if i==0 else (n if n is not None else float('-inf')),Qt.ItemDataRole.UserRole); items.append(item)
             self.model.appendRow(items)
         self.proxy.sort(-1); self.table.horizontalHeader().setSortIndicator(-1,Qt.SortOrder.AscendingOrder); self.table.setSortingEnabled(True)
