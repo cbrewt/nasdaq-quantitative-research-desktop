@@ -452,3 +452,11 @@ November 25, 2026: User accepted technical visualization and authorized Step 9 u
 ## Milestone 09 - Historical Simulation and Reporting
 
 Implementation and verification in progress; formal acceptance pending.
+
+## Milestone 09 - Formal acceptance
+
+November 25, 2026: User accepted historical simulation and reporting and authorized Step 10.
+
+## Milestone 10 - Database Integration
+
+Screening output persistence checkpoint; further integration and verification pending.

@@ -7,6 +7,9 @@ from PySide6.QtWidgets import (QMainWindow,QWidget,QVBoxLayout,QHBoxLayout,QForm
 from .charts import Chart, PANELS, extract
 from ..application.historical import export_scan, historical
 from pathlib import Path
+from uuid import uuid4
+from ..infrastructure.repository import Repository, utc
+from PySide6.QtWidgets import QInputDialog, QTableWidget, QTableWidgetItem
 from PySide6.QtWidgets import QFileDialog, QSpinBox
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices
@@ -76,13 +79,11 @@ class Window(QMainWindow):
         super().__init__(); self.setWindowTitle('Nasdaq Quantitative Research V2.0 — Prototype'); self.resize(1280,800); self.setMinimumSize(800,560)
         self.setStyleSheet('''QWidget {background:#141e2c;color:#e5edf6;font-size:14px;} QGroupBox {border:1px solid #394b62;border-radius:6px;margin-top:14px;padding:12px;} QGroupBox::title {subcontrol-origin:margin;left:12px;} QListWidget,QTableView,QLineEdit,QDoubleSpinBox,QComboBox {background:#202e40;border:1px solid #45566b;padding:5px;} QListWidget::item {padding:13px;} QListWidget::item:selected {background:#315c83;} QPushButton {background:#25689e;padding:9px 15px;border-radius:5px;} QPushButton:disabled {background:#303b49;color:#a6b3c2;} QHeaderView::section {background:#2b3d53;padding:7px;border:0;} QTableView {alternate-background-color:#192637;gridline-color:#36465a;} QLabel#heading {font-size:25px;font-weight:bold;} QWidget:focus {outline:1px solid #8ac8fb;}''')
         root=QWidget(); self.setCentralWidget(root); outer=QVBoxLayout(root)
-        banner=QLabel('LIVE SCREENING • Sample preview available • Database not connected'); banner.setStyleSheet('background:#4b3821;color:#ffe3b0;padding:10px;font-weight:bold'); outer.addWidget(banner)
+        self.repo=None; self._db_thread=None; self._db_worker=None; self.saved_uuid=None; self.banner=QLabel('LIVE SCREENING • Sample preview available • Database not connected'); banner=self.banner; banner.setStyleSheet('background:#4b3821;color:#ffe3b0;padding:10px;font-weight:bold'); outer.addWidget(banner)
         body=QHBoxLayout(); outer.addLayout(body,1); self.nav=QListWidget(); self.nav.addItems(NAMES); self.nav.setFixedWidth(215); body.addWidget(self.nav); self.stack=QStackedWidget(); body.addWidget(self.stack,1)
         self.nav.currentRowChanged.connect(self.stack.setCurrentIndex)
         self._thread=None; self._worker=None; self._token=None; self.live_matches=None; self.snapshot=None; self._history_thread=None; self.make_screener(); self.make_analysis(); self.make_backtesting()
-        for name,description in [('Research History','Saved research runs and parameters — database integration in Milestone 10.'),('Settings','Application and database configuration — not connected. No credentials are requested or stored.')]:
-            _,layout=self.page(name); label=QLabel(description); label.setWordWrap(True); layout.addWidget(label); layout.addStretch()
-            if name=='Research History': self.make_reports()
+        self.make_research_history(); self.make_reports(); self.make_database_settings()
         for name in ['File','Research','View','Tools','Help']:
             menu=self.menuBar().addMenu(name)
             if name=='File': menu.addAction('Exit',self.close)
@@ -147,7 +148,7 @@ class Window(QMainWindow):
 
     def start_scan(self, request):
         if self._thread is not None or self._history_thread is not None: return
-        self.snapshot=None; self.scan_request=request
+        self.snapshot=None; self.scan_request=request; self.scan_started=utc(); self.saved_uuid=None
         self.clear_charts(); self.live_matches={}; self.model.removeRows(0,self.model.rowCount()); self.detail.setText('No current result'); self.filter.clear()
         self.summary.setText('Starting live scan'); self.statusBar().showMessage('Scanning in background'); self.progress.setRange(0,0)
         for control in (self.live,self.run,self.minimum,self.maximum,self.gain,self.mode): control.setEnabled(False)
@@ -177,7 +178,7 @@ class Window(QMainWindow):
     @Slot(object,object,object)
     def scan_succeeded(self,dates,result,matches):
         if self._token is not None and self._token.is_set(): self.scan_cancelled(); return
-        self.snapshot=(self.scan_request,tuple(dates),result,tuple(matches)); self.show_live(dates,result,matches); self.progress.setRange(0,100); self.progress.setValue(100); self.cancel.setEnabled(False)
+        self.snapshot=(self.scan_request,tuple(dates),result,tuple(matches)); self.show_live(dates,result,matches); self.progress.setRange(0,100); self.progress.setValue(100); self.cancel.setEnabled(False); self.scan_completed=utc(); self.scan_uuid=str(uuid4()); self.save_current_scan()
 
     @Slot(str)
     def scan_failed(self,message):
@@ -194,6 +195,8 @@ class Window(QMainWindow):
         self.cancel.setEnabled(False)
 
     def closeEvent(self,event):
+        if self._db_thread is not None:
+            event.ignore(); self.statusBar().showMessage('Database operation still running'); return
         if self._history_thread is not None:
             event.ignore(); self.statusBar().showMessage('Historical simulation still running'); return
         if self._thread is not None:
@@ -211,7 +214,7 @@ class Window(QMainWindow):
             self.model.appendRow(items)
         self.proxy.sort(-1); self.table.horizontalHeader().setSortIndicator(-1,Qt.SortOrder.AscendingOrder); self.table.setSortingEnabled(True)
         self.summary.setText(f'Completed sessions {dates[0]} to {dates[-1]} | Checked {result.checked} | Qualified {len(matches)} | Incomplete prices {result.missing} | Reverse splits {result.excluded_reverse} | Unverified splits {result.excluded_unverified} | Momentum exclusions {result.excluded_momentum}')
-        self.statusBar().showMessage('Scan complete | Database not connected')
+        self.statusBar().showMessage('Scan complete | Database save pending')
 
     def make_backtesting(self):
         _,layout=self.page('Backtesting'); form=QFormLayout(); layout.addLayout(form)
@@ -258,3 +261,63 @@ class Window(QMainWindow):
     def history_finished(self):
         self._history_thread=None; self._history_worker=None
         for control in (self.backtest_button,self.export_button,self.live,self.run): control.setEnabled(True)
+
+    def make_research_history(self):
+        _,layout=self.page('Research History'); self.db_status=QLabel('Connect in Settings. Saved screening outputs are not complete replayable snapshots.'); self.db_status.setWordWrap(True); layout.addWidget(self.db_status)
+        self.history_list=QListWidget(); layout.addWidget(self.history_list,1)
+        self.history_table=QTableWidget(0,10); self.history_table.setHorizontalHeaderLabels(['Ticker','Close','Gain %','Score','MACD','Histogram','Rising days','RSI','RVOL','Median dollar volume']); layout.addWidget(self.history_table,2)
+        for title,callback in [('Refresh saved scans',self.refresh_saved),('View selected scan',self.load_saved),('Save current live scan',self.save_current_scan)]:
+            btn=QPushButton(title); btn.clicked.connect(callback); layout.addWidget(btn)
+    def make_database_settings(self):
+        _,layout=self.page('Settings'); self.connection_label=QLabel('MySQL disconnected. Password held in memory only.'); layout.addWidget(self.connection_label)
+        self.db_port=QSpinBox(); self.db_port.setRange(1,65535); self.db_port.setValue(3306); layout.addWidget(QLabel('Local MySQL port')); layout.addWidget(self.db_port)
+        btn=QPushButton('Connect to research database'); btn.clicked.connect(self.connect_database); layout.addWidget(btn); layout.addStretch()
+    def connect_database(self):
+        if self._db_thread is not None: return
+        password,ok=QInputDialog.getText(self,'MySQL','Password for nasdaq_research_app:',QLineEdit.EchoMode.Password)
+        if not ok: return
+        repo=Repository(password,self.db_port.value()); self.db_job(lambda:repo.history(),lambda rows:self.connected(repo,rows))
+    def connected(self,repo,rows):
+        self.repo=repo; self.connection_label.setText('Connected: nasdaq_quant_research_v2'); self.banner.setText('LIVE SCREENING • MySQL connected • Screening outputs only'); self.fill_history(rows)
+    def db_job(self,fn,done):
+        if self._db_thread is not None: self.db_status.setText('Database operation busy; retry when finished.'); return
+        self._db_thread=QThread(self); self._db_worker=DatabaseWorker(fn); self._db_worker.moveToThread(self._db_thread); self._db_done=done
+        self._db_thread.started.connect(self._db_worker.run); self._db_worker.succeeded.connect(self.db_success); self._db_worker.failed.connect(self.db_failed); self._db_worker.finished.connect(self._db_thread.quit); self._db_worker.finished.connect(self._db_worker.deleteLater); self._db_thread.finished.connect(self.db_finished); self._db_thread.finished.connect(self._db_thread.deleteLater); self._db_thread.start()
+    @Slot(object)
+    def db_success(self,value): self._db_done(value)
+    @Slot(str)
+    def db_failed(self,message): self.db_status.setText('Database operation failed: '+message+' — current research retained.'); self.statusBar().showMessage('Database operation failed; see Research History')
+    @Slot()
+    def db_finished(self): self._db_thread=None; self._db_worker=None; self._db_done=None
+    def fill_history(self,rows):
+        self.history_list.clear()
+        for row in rows: self.history_list.addItem(f'{row[0]} | {row[1]} | ${row[2]:g}–${row[3]:g} | Gain {row[4]:g}% | '+('Strict' if row[5] else 'Research')+f' | {row[6]} matches')
+        self.db_status.setText(f'{len(rows)} saved scans (latest 500). Screening outputs only.')
+    def refresh_saved(self):
+        if self.repo is None: self.db_status.setText('Connect in Settings first.'); return
+        self.db_job(self.repo.history,self.fill_history)
+    def load_saved(self):
+        item=self.history_list.currentItem()
+        if self.repo is None or item is None: return
+        run_id=int(item.text().split('|')[0]); self.db_job(lambda:self.repo.results(run_id),self.fill_saved_results)
+    def fill_saved_results(self,rows):
+        self.history_table.setRowCount(len(rows))
+        for i,row in enumerate(rows):
+            for j,val in enumerate(row): self.history_table.setItem(i,j,QTableWidgetItem(display_text(j,val)))
+    def save_current_scan(self):
+        if self.repo is None: self.db_status.setText('Not connected; live scan retained in memory only. Connect and use Save current live scan.'); return
+        if self.snapshot is None or not hasattr(self,'scan_uuid'): return
+        if self.saved_uuid==self.scan_uuid: self.db_status.setText('Current scan already saved.'); return
+        snap=self.snapshot; uid=self.scan_uuid; started=self.scan_started; finished=self.scan_completed; repo=self.repo
+        self.db_job(lambda:repo.save_scan(snap,started,finished,uid),lambda run:self.scan_saved(run,uid))
+    def scan_saved(self,run,uid):
+        self.saved_uuid=uid; self.db_status.setText(f'Screening outputs saved: run {run}. Refresh saved scans to view.'); self.statusBar().showMessage(f'Screening outputs saved: run {run}')
+
+class DatabaseWorker(QObject):
+    succeeded=Signal(object); failed=Signal(str); finished=Signal()
+    def __init__(self,fn): super().__init__(); self.fn=fn
+    @Slot()
+    def run(self):
+        try: self.succeeded.emit(self.fn())
+        except Exception as exc: self.failed.emit(str(exc))
+        finally: self.finished.emit()
