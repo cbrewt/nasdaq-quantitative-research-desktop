@@ -1,0 +1,38 @@
+digraph schema {
+graph [rankdir=LR, bgcolor="white", pad=0.3, nodesep=0.35, ranksep=0.85];
+node [shape=box, style="rounded,filled", fillcolor="#edf3f8", color="#46647e", fontname="Arial", fontsize=11];
+edge [color="#60798c", fontname="Arial", fontsize=9];
+schema_migration [label="schema_migration\nPK: version"];
+research_run [label="research_run\nPK: run_id"];
+screening_run [label="screening_run\nPK: run_id"];
+research_run -> screening_run [label="run_id"];
+backtest_run [label="backtest_run\nPK: run_id"];
+research_run -> backtest_run [label="run_id"];
+screening_run -> backtest_run [label="source_scan_run_id"];
+security [label="security\nPK: security_id"];
+run_security [label="run_security\nPK: run_id, security_id"];
+research_run -> run_security [label="run_id"];
+security -> run_security [label="security_id"];
+input_artifact [label="input_artifact\nPK: artifact_id"];
+research_run -> input_artifact [label="run_id"];
+run_security -> input_artifact [label="run_id, security_id"];
+trading_session [label="trading_session\nPK: run_id, session_date"];
+research_run -> trading_session [label="run_id"];
+daily_observation [label="daily_observation\nPK: run_id, security_id, series_kind, session_date"];
+run_security -> daily_observation [label="run_id, security_id"];
+screening_result [label="screening_result\nPK: run_id, security_id"];
+run_security -> screening_result [label="run_id, security_id"];
+screening_run -> screening_result [label="run_id"];
+historical_signal [label="historical_signal\nPK: run_id, security_id, signal_date"];
+run_security -> historical_signal [label="run_id, security_id"];
+backtest_run -> historical_signal [label="run_id"];
+trading_session -> historical_signal [label="run_id, signal_date"];
+simulated_trade [label="simulated_trade\nPK: run_id, security_id, signal_date"];
+historical_signal -> simulated_trade [label="run_id, security_id, signal_date"];
+trading_session -> simulated_trade [label="run_id, entry_date"];
+trading_session -> simulated_trade [label="run_id, exit_date"];
+performance_summary [label="performance_summary\nPK: run_id, score_group"];
+backtest_run -> performance_summary [label="run_id"];
+research_report [label="research_report\nPK: report_id"];
+research_run -> research_report [label="run_id"];
+}

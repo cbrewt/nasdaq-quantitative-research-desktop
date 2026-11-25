@@ -49,3 +49,5 @@ Desktop.ini
 # Temporary files
 *.tmp
 *.bak
+# Local development packages and operational evidence
+/packages/

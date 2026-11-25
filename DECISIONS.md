@@ -702,3 +702,12 @@ Comprehensive quantitative equivalence requires
 separate implementation verification.
 
 References: ARCH-001, QPC-001 and DIC-001.
+
+
+## DEV-002 - Accelerated Development Methodology
+
+Approved November 25, 2026: design/approval, implementation/testing, acceptance. Consolidate routine operations and delegate minor decisions within approved scope; retain major approvals and twelve milestones.
+
+## DBD-001 - Database design approval
+
+Approved November 25, 2026. Dedicated MySQL schema, fourteen tables, migration 001, restricted loopback account, initial backup and recovery verified. See docs/database/VERIFICATION.md.

@@ -390,3 +390,16 @@ Milestone 03 status: NOT AUTHORIZED
 
 Development shall remain paused until explicit
 authorization to commence Milestone 03 is received.
+
+
+## Milestone 03 - MySQL Database Design
+
+Status: COMPLETE - FORMALLY ACCEPTED
+
+Acceptance date: November 25, 2026
+
+DBD-001 approved and installed. Schema, synthetic transaction tests, least-privilege tests and initial backup/recovery passed. Initial backup authentication failure resolved via recovery-only procedure. See docs/database/VERIFICATION.md. Populated recovery and repository integration remain later milestones.
+
+User acceptance: "I formally accept Development Step 3. Consolidate the documentation and Git commit, then proceed with Development Step 4 under DEV-002."
+
+Milestone 04 authorized; UI design approval required before prototype implementation.
