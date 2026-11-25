@@ -254,3 +254,121 @@ rather than silently removed.
 
 No unapproved dependency, feature, or quantitative
 methodology change shall be introduced.
+## ADR-015 - Validated Integration Baseline Selection
+
+Date: November 24, 2026
+
+Status: APPROVED AND VALIDATED
+
+Context:
+
+Final baseline protection verification identified
+three Python source files that differed from their
+counterparts in the original Version 1.2 archive.
+
+Of the 29 Python source files examined, 26 were
+byte-identical. No files were missing or additional.
+
+The three differences were investigated individually.
+
+Identified differences:
+
+1. Backtesting_Engine/integrated_report.py
+
+   Added repeating Word table column headings
+   for multipage reports.
+
+2. Backtesting_Engine/scored_integrated_report.py
+
+   Added a page break before the Limitations
+   and Interpretation section.
+
+3. tests/Step7_Integration_Tests.py
+
+   Added an eighteenth integration test verifying
+   the repeating Word table header property.
+
+No quantitative methodology changes were identified
+in the reviewed source differences.
+
+Decision:
+
+Preserve the original Version 1.2 archive and the
+enhanced working source revision.
+
+Adopt the separately validated source revision as
+the Version 2.0 quantitative research integration
+baseline.
+
+Original protected archive:
+
+Nasdaq_Quant_Research_V1_2_Final.zip
+
+SHA-256:
+f0d8cfd042d2374ef64370ec6aff495bcf3123d8ab28d015d80e62b16a0a15b4
+
+Validated integration baseline archive:
+
+Nasdaq_Quant_Research_V1_2_Validated_Source.zip
+
+SHA-256:
+71ec91441fe26f35e34534b5e758c01a4b8aacf2e75938aa156a4f78ef457909
+
+Archive size: 83543 bytes
+Python source files: 29
+
+Verification evidence:
+
+- All 29 source files copied to an isolated workspace.
+- All 29 individual source checksums verified.
+- Step 6 offline regression tests: 16 of 16 passed.
+- Step 7 offline integration tests: 18 of 18 passed.
+- Combined automated tests: 34 of 34 passed.
+- Reported test failures and errors: zero.
+- Validated ZIP archive integrity: passed.
+- Validated archive source inventory: passed.
+- Original archive checksum preservation: passed.
+
+Test environment:
+
+Python 3.14.2
+Version 2.0 isolated virtual environment.
+
+Rationale:
+
+Preserve legitimate report presentation enhancements
+while maintaining an immutable original backup and
+a reproducible source integration baseline.
+
+Consequences:
+
+Both archives shall remain protected and unchanged.
+
+Version 2.0 integration shall use a separate working
+copy of the validated source archive.
+
+Neither protected Version 1.2 source state shall
+be modified during Version 2.0 development.
+
+Limitations:
+
+The date on which the three source changes were
+originally introduced has not been established.
+
+The successful offline tests do not independently
+establish comprehensive quantitative equivalence,
+live market data functionality, or MySQL connectivity.
+
+These matters remain subject to the approved
+Version 2.0 development roadmap.
+
+The validated archive contains Python source files
+only and does not replace the original comprehensive
+Version 1.2 backup.
+
+Relationship to previous decisions:
+
+ADR-002 remains in force.
+
+ADR-015 supplements the original baseline protection
+decision without superseding its requirements.
