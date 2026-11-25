@@ -428,3 +428,11 @@ User formally accepted prototype and authorized Milestone 06 under DEV-002 on No
 ## Milestone 06 - Quantitative Research Engine Integration
 
 Status: IMPLEMENTATION TESTED OFFLINE - LIVE ACCEPTANCE PENDING
+
+## Milestone 06 - Formal acceptance
+
+November 25, 2026: User formally accepted Development Step 6 and authorized Step 7 under DEV-002. Live screening, stock analysis and offline verification passed; commit db39a07. Independent quantitative replay remains later QA. Installer import workaround remains documented.
+
+## Milestone 07 - Background Processing
+
+Implementation and automated verification in progress; formal acceptance pending.
