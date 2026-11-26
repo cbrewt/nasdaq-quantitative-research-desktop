@@ -37,4 +37,15 @@ class CalendarTests(unittest.TestCase):
         with patch.dict(c.VERIFIED_LISTINGS,{'ABC':(suffix[0],'fixture')}),patch.object(c,'download_historical_prices',return_value=frame),patch.object(c,'evaluate_historical_period') as evaluate:
             result=c.run_multi_stock_backtest(['ABC'],dates)
         evaluate.assert_not_called(); self.assertEqual(result.signals,())
+    def test_registry_lse(self):
+        dates=[date(2024,12,18),date(2024,12,19),date(2024,12,20)]
+        self.assertEqual(c.eligible_calendar('LSE',dates,dates[1:]),dates[1:])
+        with self.assertRaises(ValueError): c.eligible_calendar('LSE',dates,dates[2:])
+    def test_preflight_aggregates(self):
+        frame=pd.DataFrame(index=pd.to_datetime(self.dates[1:]))
+        with patch.object(c,'download_historical_prices',return_value=frame) as download, patch.object(c,'evaluate_historical_period') as evaluate:
+            with self.assertRaisesRegex(ValueError, r'ABC:.*XYZ:'):
+                c.run_multi_stock_backtest(['ABC','XYZ'],self.dates)
+        self.assertEqual(download.call_count,2)
+        evaluate.assert_not_called()
 if __name__=='__main__': unittest.main()

@@ -1,0 +1,10 @@
+{
+  "STAK": {
+    "first_trading_date": "2025-02-26",
+    "source": "https://www.sec.gov/Archives/edgar/data/2002453/000149315225009229/ex99-1.htm"
+  },
+  "LSE": {
+    "first_trading_date": "2024-12-19",
+    "source": "https://www.sec.gov/Archives/edgar/data/1985139/000149315226004368/form20-f.htm"
+  }
+}

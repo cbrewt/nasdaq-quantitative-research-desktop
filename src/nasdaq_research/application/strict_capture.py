@@ -31,9 +31,27 @@ from Backtesting_Engine.signal_engine import (
 
 
 # CAL-001: independently verified first trading sessions, not inferred from provider gaps.
-VERIFIED_LISTINGS = {
-    "STAK": (date(2025, 2, 26), "https://www.sec.gov/Archives/edgar/data/2002453/000149315225009229/ex99-1.htm"),
-}
+def load_verified_listings(path=None):
+    from pathlib import Path
+    import json
+    path = Path(path) if path is not None else Path(__file__).with_name("verified_listings.json")
+    def unique(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result: raise ValueError(f"Duplicate registry key: {key}")
+            result[key] = value
+        return result
+    raw = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique)
+    if not isinstance(raw, dict): raise ValueError("Invalid listing registry")
+    result = {}
+    for symbol, item in raw.items():
+        if not re.fullmatch(r"[A-Z0-9.-]+", symbol): raise ValueError("Invalid registry ticker")
+        if not isinstance(item, dict) or set(item) != {"first_trading_date", "source"}: raise ValueError(f"Invalid listing evidence: {symbol}")
+        if not isinstance(item["source"], str) or not item["source"].startswith("https://"): raise ValueError(f"Invalid source: {symbol}")
+        result[symbol] = (date.fromisoformat(item["first_trading_date"]), item["source"])
+    return result
+
+VERIFIED_LISTINGS = load_verified_listings()
 
 
 def eligible_calendar(symbol, dates, observed_dates):
@@ -254,22 +272,24 @@ def run_multi_stock_backtest(
 
     signal_counts: list[tuple[str, int]] = []
 
+    # Preflight every candidate once. No signal evaluation until all calendars pass.
+    calendars = {}
+    discrepancies = []
     for symbol in symbols:
-
-        print(
-            f"Downloading historical prices for {symbol}..."
-        )
-
-        history = download_historical_prices(
-            ticker=symbol,
-            start_date=dates[0],
-            end_date=dates[-1],
-        )
-
-        # Only independently verified pre-listing sessions may be absent.
-        observed_dates = list(history.index.date)
-        symbol_dates = eligible_calendar(symbol, dates, observed_dates)
-        histories[symbol] = history
+        print(f"Downloading historical prices for {symbol}...", flush=True)
+        try:
+            history = download_historical_prices(ticker=symbol, start_date=dates[0], end_date=dates[-1])
+            calendars[symbol] = eligible_calendar(symbol, dates, list(history.index.date))
+            histories[symbol] = history
+        except Exception as exc:
+            discrepancies.append(f"{symbol}: {exc}")
+    if discrepancies:
+        message = "Historical calendar/data preflight failed: " + " | ".join(discrepancies)
+        print(message, flush=True)
+        raise ValueError(message)
+    for symbol in symbols:
+        history = histories[symbol]
+        symbol_dates = calendars[symbol]
 
         # The original evaluator enforces its 21-session window and indicator
         # eligibility. Do not fabricate pre-listing observations or warmup data.
