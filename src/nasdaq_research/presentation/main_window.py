@@ -235,7 +235,7 @@ class Window(QMainWindow):
         if self.snapshot is None or self._thread is not None or self._history_thread is not None:
             self.report_status.setText('A completed live scan is required.'); return
         try:
-            h,report=export_scan(self.snapshot,self.reports_dir()); self.report_status.setText(str(report))
+            h,report=export_scan(self.snapshot,self.reports_dir()); self.report_status.setText(str(report)); self.pending_report=(self.scan_uuid,report); self.save_pending_report()
         except Exception as exc: self.report_status.setText('Report failed: '+str(exc))
     def start_history(self):
         if self.snapshot is None or self._thread is not None or self._history_thread is not None:
@@ -245,7 +245,7 @@ class Window(QMainWindow):
         try:
             h,report=export_scan(self.snapshot,self.reports_dir(),self.years.value(),self.holding.value(),self.cost.value())
         except Exception as exc: self.history_status.setText('Export failed: '+str(exc)); return
-        self.report_status.setText(str(report)); self.history_status.setText('Historical simulation running…')
+        self.report_status.setText(str(report)); self.history_status.setText('Historical simulation running…'); self.history_context=(self.scan_uuid,report,utc(),str(uuid4()))
         for control in (self.backtest_button,self.export_button,self.live,self.run): control.setEnabled(False)
         self._history_thread=QThread(self); self._history_worker=HistoricalWorker(h,report); self._history_worker.moveToThread(self._history_thread)
         self._history_thread.started.connect(self._history_worker.run); self._history_worker.succeeded.connect(self.history_done); self._history_worker.failed.connect(self.history_failed); self._history_worker.finished.connect(self._history_thread.quit); self._history_worker.finished.connect(self._history_worker.deleteLater); self._history_thread.finished.connect(self.history_finished); self._history_thread.finished.connect(self._history_thread.deleteLater); self._history_thread.start()
@@ -254,7 +254,7 @@ class Window(QMainWindow):
         if result.backtest is None: self.history_status.setText('No historical simulation performed.'); return
         sim=result.backtest.analysis.simulation
         self.history_status.setText(f'Historical period: {result.start_date} through {result.end_date} | Signals: {sim.total_signals} | Completed trades: {len(sim.trades)}\nIntegrated report: {path}')
-        self.report_status.setText(str(path))
+        self.report_status.setText(str(path)); uid,screen,started,run_uuid=self.history_context; self.pending_history=(uid,result,path,screen,started,utc(),run_uuid); self.save_pending_history()
     @Slot(str)
     def history_failed(self,message): self.history_status.setText('Historical simulation/report failed: '+message+' — screening report retained.')
     @Slot()
@@ -266,7 +266,7 @@ class Window(QMainWindow):
         _,layout=self.page('Research History'); self.db_status=QLabel('Connect in Settings. Saved screening outputs are not complete replayable snapshots.'); self.db_status.setWordWrap(True); layout.addWidget(self.db_status)
         self.history_list=QListWidget(); layout.addWidget(self.history_list,1)
         self.history_table=QTableWidget(0,10); self.history_table.setHorizontalHeaderLabels(['Ticker','Close','Gain %','Score','MACD','Histogram','Rising days','RSI','RVOL','Median dollar volume']); layout.addWidget(self.history_table,2)
-        for title,callback in [('Refresh saved scans',self.refresh_saved),('View selected scan',self.load_saved),('Save current live scan',self.save_current_scan)]:
+        for title,callback in [('Refresh saved scans',self.refresh_saved),('View selected scan',self.load_saved),('Save current live scan',self.save_current_scan),('Save latest simulation',self.save_pending_history),('Save latest screening report',self.save_pending_report),('View saved simulations',self.view_simulations)]:
             btn=QPushButton(title); btn.clicked.connect(callback); layout.addWidget(btn)
     def make_database_settings(self):
         _,layout=self.page('Settings'); self.connection_label=QLabel('MySQL disconnected. Password held in memory only.'); layout.addWidget(self.connection_label)
@@ -278,7 +278,7 @@ class Window(QMainWindow):
         if not ok: return
         repo=Repository(password,self.db_port.value()); self.db_job(lambda:repo.history(),lambda rows:self.connected(repo,rows))
     def connected(self,repo,rows):
-        self.repo=repo; self.connection_label.setText('Connected: nasdaq_quant_research_v2'); self.banner.setText('LIVE SCREENING • MySQL connected • Screening outputs only'); self.fill_history(rows)
+        self.repo=repo; self.connection_label.setText('Connected: nasdaq_quant_research_v2'); self.banner.setText('LIVE SCREENING • MySQL connected • Research outputs only (not replayable)'); self.fill_history(rows); self.statusBar().showMessage('MySQL connected')
     def db_job(self,fn,done):
         if self._db_thread is not None: self.db_status.setText('Database operation busy; retry when finished.'); return
         self._db_thread=QThread(self); self._db_worker=DatabaseWorker(fn); self._db_worker.moveToThread(self._db_thread); self._db_done=done
@@ -292,7 +292,7 @@ class Window(QMainWindow):
     def fill_history(self,rows):
         self.history_list.clear()
         for row in rows: self.history_list.addItem(f'{row[0]} | {row[1]} | ${row[2]:g}–${row[3]:g} | Gain {row[4]:g}% | '+('Strict' if row[5] else 'Research')+f' | {row[6]} matches')
-        self.db_status.setText(f'{len(rows)} saved scans (latest 500). Screening outputs only.')
+        self.db_status.setText(f'{len(rows)} saved scans (latest 500). Research outputs only.')
     def refresh_saved(self):
         if self.repo is None: self.db_status.setText('Connect in Settings first.'); return
         self.db_job(self.repo.history,self.fill_history)
@@ -310,6 +310,19 @@ class Window(QMainWindow):
         if self.saved_uuid==self.scan_uuid: self.db_status.setText('Current scan already saved.'); return
         snap=self.snapshot; uid=self.scan_uuid; started=self.scan_started; finished=self.scan_completed; repo=self.repo
         self.db_job(lambda:repo.save_scan(snap,started,finished,uid),lambda run:self.scan_saved(run,uid))
+    def save_pending_report(self):
+        if self.repo is None or not hasattr(self,'pending_report'): self.report_status.setText('Connect and generate a screening report first.'); return
+        args=self.pending_report; repo=self.repo
+        self.db_job(lambda:repo.save_report(*args),lambda run:self.report_status.setText(f'Screening report saved to MySQL: run {run}'))
+    def save_pending_history(self):
+        if self.repo is None or not hasattr(self,'pending_history'): self.db_status.setText('Connect and complete a historical simulation first.'); return
+        args=self.pending_history; repo=self.repo
+        self.db_job(lambda:repo.save_history(*args),lambda run:self.db_status.setText(f'Historical outputs saved: run {run} (not replayable).'))
+    def view_simulations(self):
+        item=self.history_list.currentItem()
+        if self.repo is None or item is None: return
+        run=int(item.text().split('|')[0]); repo=self.repo
+        self.db_job(lambda:repo.simulations_for_run(run),lambda rows:self.db_status.setText('Saved simulations: '+('; '.join(f'run {r[0]}: {r[1]} signals, {r[2]} trades, {r[3]} reports' for r in rows) or 'none')))
     def scan_saved(self,run,uid):
         self.saved_uuid=uid; self.db_status.setText(f'Screening outputs saved: run {run}. Refresh saved scans to view.'); self.statusBar().showMessage(f'Screening outputs saved: run {run}')
 
