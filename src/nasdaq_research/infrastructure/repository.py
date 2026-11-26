@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 from contextlib import contextmanager
 from ..application.screening import number
+from .input_capture import store_capture
 
 FLAGS=('macd_positive','histogram_positive','histogram_rising_three','rsi_50_to_70','relative_volume_above_one')
 COLS=('Open','High','Low','Close','Volume','MACD','Signal','Histogram','NormalizedHistogram','RSI','RelativeVolume','RisingDays')
@@ -28,13 +29,13 @@ class Repository:
     def results(self,run_id):
         with self.connection() as cn:
             cur=cn.cursor(); cur.execute("SELECT u.ticker,s.last_close,s.gain_pct,s.technical_score,d.macd,d.histogram,d.rising_days,d.rsi,d.relative_volume,s.median_dollar_volume FROM screening_result s JOIN run_security u ON u.run_id=s.run_id AND u.security_id=s.security_id JOIN screening_run a ON a.run_id=s.run_id LEFT JOIN daily_observation d ON d.run_id=s.run_id AND d.security_id=s.security_id AND d.series_kind='SCREEN_DISPLAY' AND d.session_date=a.scan_date WHERE s.run_id=%s ORDER BY s.report_rank",(run_id,)); return cur.fetchall()
-    def save_scan(self,snapshot,started,finished,scan_uuid):
+    def save_scan(self,snapshot,started,finished,scan_uuid,capture=None):
         request,dates,result,matches=snapshot
         with self.connection() as cn:
             cur=cn.cursor()
             def insert(table,columns,values):
                 cur.execute('INSERT INTO '+table+' ('+','.join(columns)+') VALUES ('+','.join(['%s']*len(columns))+')',tuple(values)); return cur.lastrowid
-            run=insert('research_run',('run_uuid','run_kind','started_utc','finished_utc','status','engine_revision','environment_json'),(scan_uuid,'SCAN',started,finished,'COMPLETED','V1.2 validated / V2 Step 10',json.dumps({'python':sys.version,'platform':platform.platform(),'input_capture':'qualified display observations only; not replayable','history_defaults':'2 years, 5 sessions, 0.50%'})))
+            run=insert('research_run',('run_uuid','run_kind','started_utc','finished_utc','status','engine_revision','environment_json'),(scan_uuid,'SCAN',started,finished,'COMPLETED','V1.2 validated / V2 Step 10',json.dumps({'python':sys.version,'platform':platform.platform(),'input_capture':('provider inputs archived; replay unverified' if capture is not None and not capture.errors else 'partial or absent capture; not replayable'),'history_defaults':'2 years, 5 sessions, 0.50%'})))
             insert('screening_run',('run_id','scan_id','scan_date','min_gain_pct','min_price','max_price','momentum_required','batch_size','batch_delay_seconds','retries','history_years','holding_sessions','round_trip_cost_pct','checked','missing','initial_matches','excluded_reverse','excluded_unverified','excluded_momentum'),(run,scan_uuid,dates[-1],request.gain,request.minimum,request.maximum,int(request.strict),50,1.25,2,2,5,.5,result.checked,result.missing,result.initial_matches,result.excluded_reverse,result.excluded_unverified,result.excluded_momentum))
             for i,d in enumerate(dates,1): insert('trading_session',('run_id','session_date','session_no'),(run,d,i))
             ranks={m.security.ticker:i for i,m in enumerate(result.matches,1)}
@@ -46,6 +47,7 @@ class Repository:
                 for d,row in m.daily.iterrows():
                     vals=[number(row.get(k)) for k in COLS]; vals[-1]=None if vals[-1] is None else int(vals[-1])
                     insert('daily_observation',('run_id','security_id','series_kind','session_date','open_price','high_price','low_price','close_price','volume','macd','signal_line','histogram','normalized_histogram','rsi','relative_volume','rising_days'),(run,sid,'SCREEN_DISPLAY',str(d)[:10],*vals))
+            store_capture(cur,run,capture)
             return run
 
     def _source_run(self,cur,uid):
@@ -68,7 +70,7 @@ class Repository:
     def save_report(self,uid,path):
         with self.connection() as cn:
             cur=cn.cursor(); run=self._source_run(cur,uid); return run,self._insert_report(cur,run,path,'SCREENING')
-    def save_history(self,uid,result,path,screen_report,started,finished,run_uuid):
+    def save_history(self,uid,result,path,screen_report,started,finished,run_uuid,capture=None):
         h=result.handoff; b=result.backtest; sim=b.analysis.simulation
         if h.screener_settings.momentum_confirmation_required:
             from Backtesting_Engine.scored_backtest import ScoredSignal, ScorePerformance
@@ -87,7 +89,7 @@ class Repository:
             if existing: return existing[0]
             def ins(table,cols,vals):
                 cur.execute('INSERT INTO '+table+' ('+','.join(cols)+') VALUES ('+','.join(['%s']*len(cols))+')',tuple(vals)); return cur.lastrowid
-            run=ins('research_run',('run_uuid','run_kind','started_utc','finished_utc','status','engine_revision','environment_json'),(run_uuid,'BACKTEST',started,finished,'COMPLETED','V1.2 validated / V2 Step 10',json.dumps({'input_capture':'historical outputs only; not replayable','skipped_disposition':'UNKNOWN for noncompleted signals; aggregate counts retained'})))
+            run=ins('research_run',('run_uuid','run_kind','started_utc','finished_utc','status','engine_revision','environment_json'),(run_uuid,'BACKTEST',started,finished,'COMPLETED','V1.2 validated / V2 Step 10',json.dumps({'input_capture':('provider inputs archived; replay unverified' if capture is not None and not capture.errors else 'partial or absent capture; not replayable'),'skipped_disposition':'UNKNOWN for noncompleted signals; aggregate counts retained'})))
             s=h.screener_settings; p=h.backtest_settings
             ins('backtest_run',('run_id','source_scan_run_id','history_years','evaluation_start','evaluation_end','min_gain_pct','min_price','max_price','momentum_required','holding_sessions','round_trip_cost_pct','total_signals','skipped_overlapping','skipped_incomplete'),(run,source,p.history_years,result.start_date,result.end_date,s.min_gain_pct,s.min_price,s.max_price,int(s.momentum_confirmation_required),p.holding_sessions,p.round_trip_cost_pct,sim.total_signals,sim.skipped_overlapping,sim.skipped_incomplete))
             for i,d in enumerate(result.trading_dates,1): ins('trading_session',('run_id','session_date','session_no'),(run,d,i))
@@ -108,6 +110,7 @@ class Repository:
                 ins('performance_summary',('run_id','score_group','signal_count',*fields,'profit_factor_state'),(run,group,count,*vals,'UNDEFINED' if pf is None else ('INFINITE' if math.isinf(pf) else 'FINITE')))
             self._insert_report(cur,source,screen_report,'SCREENING')
             if path is not None: self._insert_report(cur,run,path,'INTEGRATED')
+            store_capture(cur,run,capture)
             return run
     def history_simulations(self,uid):
         with self.connection() as cn:
@@ -117,6 +120,10 @@ class Repository:
     def simulations_for_run(self,source):
         with self.connection() as cn:
             cur=cn.cursor(); cur.execute('SELECT b.run_id,b.total_signals,(SELECT COUNT(*) FROM simulated_trade t WHERE t.run_id=b.run_id),(SELECT COUNT(*) FROM research_report r WHERE r.run_id=b.run_id) FROM backtest_run b WHERE b.source_scan_run_id=%s ORDER BY b.run_id DESC',(source,)); return cur.fetchall()
+
+    def capture_counts(self,source):
+        with self.connection() as cn:
+            cur=cn.cursor(); cur.execute("SELECT r.run_id,COUNT(a.artifact_id) FROM research_run r LEFT JOIN input_artifact a ON a.run_id=r.run_id WHERE r.run_id=%s OR r.run_id IN (SELECT run_id FROM backtest_run WHERE source_scan_run_id=%s) GROUP BY r.run_id ORDER BY r.run_id",(source,source)); return cur.fetchall()
 
     def screening_report_count(self,source):
         with self.connection() as cn:

@@ -1,0 +1,5 @@
+# Provider input capture — Milestone 10 checkpoint
+
+New runs record the actual Yahoo Finance API return frames at the engine boundary, Nasdaq directory response bytes, cutoff, screening request, historical handoff, listing registry and environment/source hashes. Numeric arrays are stored using NumPy non-pickle NPY bytes inside gzip JSON; payloads are chunked, SHA-256 checked after insertion and committed in the same transaction as outputs. Provider failures are logged. Capture encoding failures are recorded in the manifest and prevent a complete-capture designation. Existing runs are untouched. The history display counts artifact chunks, not distinct provider requests.
+
+This captures the data delivered to the engine, not raw HTTP responses inside yfinance. No offline replay executor or independent replay-equivalence test is implemented yet; do not label any run replay-verified. Capture is held in memory until database save; cancelled/failed operations are not stored as completed research. Live database round-trip and replay remain pending.
