@@ -79,7 +79,7 @@ class Window(QMainWindow):
         super().__init__(); self.setWindowTitle('Nasdaq Quantitative Research V2.0 — Prototype'); self.resize(1280,800); self.setMinimumSize(800,560)
         self.setStyleSheet('''QWidget {background:#141e2c;color:#e5edf6;font-size:14px;} QGroupBox {border:1px solid #394b62;border-radius:6px;margin-top:14px;padding:12px;} QGroupBox::title {subcontrol-origin:margin;left:12px;} QListWidget,QTableView,QLineEdit,QDoubleSpinBox,QComboBox {background:#202e40;border:1px solid #45566b;padding:5px;} QListWidget::item {padding:13px;} QListWidget::item:selected {background:#315c83;} QPushButton {background:#25689e;padding:9px 15px;border-radius:5px;} QPushButton:disabled {background:#303b49;color:#a6b3c2;} QHeaderView::section {background:#2b3d53;padding:7px;border:0;} QTableView {alternate-background-color:#192637;gridline-color:#36465a;} QLabel#heading {font-size:25px;font-weight:bold;} QWidget:focus {outline:1px solid #8ac8fb;}''')
         root=QWidget(); self.setCentralWidget(root); outer=QVBoxLayout(root)
-        self.repo=None; self._db_thread=None; self._db_worker=None; self.saved_uuid=None; self.banner=QLabel('LIVE SCREENING • Sample preview available • Database not connected'); banner=self.banner; banner.setStyleSheet('background:#4b3821;color:#ffe3b0;padding:10px;font-weight:bold'); outer.addWidget(banner)
+        self._report_thread=None; self._report_worker=None; self.repo=None; self._db_thread=None; self._db_worker=None; self.saved_uuid=None; self.banner=QLabel('LIVE SCREENING • Sample preview available • Database not connected'); banner=self.banner; banner.setStyleSheet('background:#4b3821;color:#ffe3b0;padding:10px;font-weight:bold'); outer.addWidget(banner)
         body=QHBoxLayout(); outer.addLayout(body,1); self.nav=QListWidget(); self.nav.addItems(NAMES); self.nav.setFixedWidth(215); body.addWidget(self.nav); self.stack=QStackedWidget(); body.addWidget(self.stack,1)
         self.nav.currentRowChanged.connect(self.stack.setCurrentIndex)
         self._thread=None; self._worker=None; self._token=None; self.live_matches=None; self.snapshot=None; self._history_thread=None; self.make_screener(); self.make_analysis(); self.make_backtesting()
@@ -147,7 +147,7 @@ class Window(QMainWindow):
         self.start_scan(request)
 
     def start_scan(self, request):
-        if self._thread is not None or self._history_thread is not None: return
+        if self._thread is not None or self._history_thread is not None or self._report_thread is not None: return
         self.snapshot=None; self.scan_request=request; self.scan_started=utc(); self.saved_uuid=None
         self.clear_charts(); self.live_matches={}; self.model.removeRows(0,self.model.rowCount()); self.detail.setText('No current result'); self.filter.clear()
         self.summary.setText('Starting live scan'); self.statusBar().showMessage('Scanning in background'); self.progress.setRange(0,0)
@@ -195,6 +195,8 @@ class Window(QMainWindow):
         self.cancel.setEnabled(False)
 
     def closeEvent(self,event):
+        if self._report_thread is not None:
+            event.ignore(); self.statusBar().showMessage("Report generation still running"); return
         if self._db_thread is not None:
             event.ignore(); self.statusBar().showMessage('Database operation still running'); return
         if self._history_thread is not None:
@@ -232,13 +234,34 @@ class Window(QMainWindow):
     def reports_dir(self):
         folder=Path.home()/'Nasdaq_Quant_Research_V2_Reports'; folder.mkdir(exist_ok=True); return folder
     def export_current(self):
+        if self._report_thread is not None or self._db_thread is not None:
+            self.report_status.setText('Report or database operation busy; retry when finished.'); return
         if self.snapshot is None or self._thread is not None or self._history_thread is not None:
             self.report_status.setText('A completed live scan is required.'); return
-        try:
-            h,report=export_scan(self.snapshot,self.reports_dir()); self.report_status.setText(str(report)); self.pending_report=(self.scan_uuid,report); self.save_pending_report()
-        except Exception as exc: self.report_status.setText('Report failed: '+str(exc))
+        snapshot=self.snapshot; uid=self.scan_uuid; directory=Path.home()/'Nasdaq_Quant_Research_V2_Reports'
+        self.report_status.setText('Generating screening report in background…')
+        for control in (self.export_button,self.backtest_button,self.live,self.run): control.setEnabled(False)
+        self._report_thread=QThread(self); self._report_worker=DatabaseWorker(lambda:(uid,export_scan(snapshot,directory)[1])); self._report_worker.moveToThread(self._report_thread)
+        self._report_thread.started.connect(self._report_worker.run)
+        self._report_worker.succeeded.connect(self.report_generated)
+        self._report_worker.failed.connect(self.report_failed)
+        self._report_worker.finished.connect(self._report_thread.quit)
+        self._report_worker.finished.connect(self._report_worker.deleteLater)
+        self._report_thread.finished.connect(self.report_finished)
+        self._report_thread.finished.connect(self._report_thread.deleteLater)
+        self._report_thread.start()
+    @Slot(object)
+    def report_generated(self,value):
+        uid,report=value; self.pending_report=(uid,report); self.report_status.setText(str(report)); self.save_pending_report()
+    @Slot(str)
+    def report_failed(self,message):
+        self.report_status.setText('Report failed: '+message)
+    @Slot()
+    def report_finished(self):
+        self._report_thread=None; self._report_worker=None
+        for control in (self.export_button,self.backtest_button,self.live,self.run): control.setEnabled(True)
     def start_history(self):
-        if self.snapshot is None or self._thread is not None or self._history_thread is not None:
+        if self.snapshot is None or self._thread is not None or self._history_thread is not None or self._report_thread is not None:
             self.history_status.setText('A completed live scan is required.'); return
         if not self.snapshot[3]: self.history_status.setText('No qualifying tickers; simulation skipped.'); return
         if QMessageBox.question(self,'Historical simulation','Run historical research for the completed scan? The interface remains responsive; cancellation is not yet available for this operation.') != QMessageBox.StandardButton.Yes: return
@@ -311,18 +334,28 @@ class Window(QMainWindow):
         snap=self.snapshot; uid=self.scan_uuid; started=self.scan_started; finished=self.scan_completed; repo=self.repo
         self.db_job(lambda:repo.save_scan(snap,started,finished,uid),lambda run:self.scan_saved(run,uid))
     def save_pending_report(self):
-        if self.repo is None or not hasattr(self,'pending_report'): self.report_status.setText('Connect and generate a screening report first.'); return
+        if self.repo is None or not hasattr(self,'pending_report'):
+            self.report_message('Connect and generate a screening report first.'); return
+        if self._db_thread is not None:
+            self.report_message('Database busy; retry Save latest screening report.'); return
         args=self.pending_report; repo=self.repo
-        self.db_job(lambda:repo.save_report(*args),lambda run:self.report_status.setText(f'Screening report saved to MySQL: run {run}'))
+        self.report_message('Saving screening report to MySQL…')
+        self.db_job(lambda:repo.save_report(*args),lambda run:self.report_message(f'Screening report saved to MySQL: run {run}'))
+    def report_message(self,message):
+        self.report_status.setText(message); self.db_status.setText(message); self.statusBar().showMessage(message)
     def save_pending_history(self):
         if self.repo is None or not hasattr(self,'pending_history'): self.db_status.setText('Connect and complete a historical simulation first.'); return
         args=self.pending_history; repo=self.repo
         self.db_job(lambda:repo.save_history(*args),lambda run:self.db_status.setText(f'Historical outputs saved: run {run} (not replayable).'))
     def view_simulations(self):
         item=self.history_list.currentItem()
-        if self.repo is None or item is None: return
+        if self.repo is None or item is None:
+            self.db_status.setText('Connect and select a saved screening run first.'); return
         run=int(item.text().split('|')[0]); repo=self.repo
-        self.db_job(lambda:repo.simulations_for_run(run),lambda rows:self.db_status.setText('Saved simulations: '+('; '.join(f'run {r[0]}: {r[1]} signals, {r[2]} trades, {r[3]} reports' for r in rows) or 'none')))
+        self.db_job(lambda:(repo.simulations_for_run(run),repo.screening_report_count(run)),self.show_saved_simulations)
+    def show_saved_simulations(self,value):
+        rows,count=value
+        self.db_status.setText('Saved simulations: '+('; '.join(f'run {r[0]}: {r[1]} signals, {r[2]} trades, {r[3]} reports' for r in rows) or 'none')+f' | Screening report records: {count}')
     def scan_saved(self,run,uid):
         self.saved_uuid=uid; self.db_status.setText(f'Screening outputs saved: run {run}. Refresh saved scans to view.'); self.statusBar().showMessage(f'Screening outputs saved: run {run}')
 

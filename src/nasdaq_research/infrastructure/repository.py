@@ -104,3 +104,7 @@ class Repository:
     def simulations_for_run(self,source):
         with self.connection() as cn:
             cur=cn.cursor(); cur.execute('SELECT b.run_id,b.total_signals,(SELECT COUNT(*) FROM simulated_trade t WHERE t.run_id=b.run_id),(SELECT COUNT(*) FROM research_report r WHERE r.run_id=b.run_id) FROM backtest_run b WHERE b.source_scan_run_id=%s ORDER BY b.run_id DESC',(source,)); return cur.fetchall()
+
+    def screening_report_count(self,source):
+        with self.connection() as cn:
+            cur=cn.cursor(); cur.execute("SELECT COUNT(*) FROM research_report WHERE run_id=%s AND report_kind='SCREENING'",(source,)); return cur.fetchone()[0]
