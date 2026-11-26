@@ -4,7 +4,7 @@ from uuid import uuid4
 import json
 from ..infrastructure.legacy_adapter import engine
 from Backtesting_Engine.screener_handoff import load_screener_handoff
-from Backtesting_Engine.screener_backtest import run_screener_backtest
+from .strict_capture import run_screener_backtest
 from Backtesting_Engine.scored_screener_integration import run_scored_screener_backtest
 from Backtesting_Engine.integrated_report import generate_integrated_report
 from Backtesting_Engine.scored_integrated_report import generate_scored_integrated_report

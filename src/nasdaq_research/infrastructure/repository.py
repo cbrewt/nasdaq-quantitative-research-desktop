@@ -70,8 +70,15 @@ class Repository:
             cur=cn.cursor(); run=self._source_run(cur,uid); return run,self._insert_report(cur,run,path,'SCREENING')
     def save_history(self,uid,result,path,screen_report,started,finished,run_uuid):
         h=result.handoff; b=result.backtest; sim=b.analysis.simulation
-        if not hasattr(b,'scored_signals'): raise ValueError('Strict-mode result does not expose all historical signals; report retained locally, not saved as a complete simulation.')
-        scored=b.scored_signals; trades={(t.ticker,t.signal_date):t for t in sim.trades}
+        if h.screener_settings.momentum_confirmation_required:
+            from Backtesting_Engine.scored_backtest import ScoredSignal, ScorePerformance
+            from Shared_Analytics.technical_scoring import evaluate_technical_score
+            scored=tuple(ScoredSignal(s,evaluate_technical_score(macd=s.macd,histogram=s.histogram,rising_days=s.rising_days,rsi=s.rsi,relative_volume=s.relative_volume)) for s in b.signals)
+            if any(item.assessment.score!=5 for item in scored): raise ValueError('Strict signal violates original momentum contract')
+            requested=b.tickers; exclusions={}; groups=(ScorePerformance(5,len(scored),len(sim.trades),b.analysis.statistics),)
+        else:
+            scored=b.scored_signals; requested=b.requested_tickers; exclusions=dict(b.excluded_tickers); groups=b.score_groups
+        trades={(t.ticker,t.signal_date):t for t in sim.trades}
         keys={(s.signal.ticker,s.signal.signal_date) for s in scored}
         if len(keys)!=len(scored) or len(scored)!=sim.total_signals or not set(trades)<=keys: raise ValueError('Historical signal accounting mismatch')
         with self.connection() as cn:
@@ -85,8 +92,8 @@ class Repository:
             ins('backtest_run',('run_id','source_scan_run_id','history_years','evaluation_start','evaluation_end','min_gain_pct','min_price','max_price','momentum_required','holding_sessions','round_trip_cost_pct','total_signals','skipped_overlapping','skipped_incomplete'),(run,source,p.history_years,result.start_date,result.end_date,s.min_gain_pct,s.min_price,s.max_price,int(s.momentum_confirmation_required),p.holding_sessions,p.round_trip_cost_pct,sim.total_signals,sim.skipped_overlapping,sim.skipped_incomplete))
             for i,d in enumerate(result.trading_dates,1): ins('trading_session',('run_id','session_date','session_no'),(run,d,i))
             cur.execute('SELECT ticker,security_id FROM run_security WHERE run_id=%s',(source,)); ids=dict(cur.fetchall())
-            exclusions=dict(b.excluded_tickers); counts=dict(b.signal_counts)
-            for ticker in b.requested_tickers:
+            counts=dict(b.signal_counts)
+            for ticker in requested:
                 ins('run_security',('run_id','security_id','ticker','disposition','reason','signal_count'),(run,ids[ticker],ticker,'EXCLUDED' if ticker in exclusions else 'ANALYZED',exclusions.get(ticker),counts.get(ticker)))
             for item in scored:
                 a=item.assessment; s=item.signal; key=(s.ticker,s.signal_date)
@@ -94,7 +101,7 @@ class Repository:
             fields=('entry_date','exit_date','holding_sessions','entry_price','exit_price','gross_return_pct','round_trip_cost_pct','net_return_pct')
             for t in sim.trades: ins('simulated_trade',('run_id','security_id','signal_date',*fields),(run,ids[t.ticker],t.signal_date,*(getattr(t,k) for k in fields)))
             fields=('total_trades','winning_trades','losing_trades','breakeven_trades','win_rate_pct','average_gross_return_pct','average_net_return_pct','average_winning_return_pct','average_losing_return_pct','expectancy_pct','profit_factor','best_trade_pct','worst_trade_pct','average_transaction_cost_pct')
-            for group,count,stats in [('ALL',sim.total_signals,b.analysis.statistics)]+[(str(g.score) if g.score is not None else 'NA',g.signal_count,g.statistics) for g in b.score_groups]:
+            for group,count,stats in [('ALL',sim.total_signals,b.analysis.statistics)]+[(str(g.score) if g.score is not None else 'NA',g.signal_count,g.statistics) for g in groups]:
                 pf=None if stats is None else stats.profit_factor
                 vals=[getattr(stats,k) if stats is not None else (0 if i<4 else None) for i,k in enumerate(fields)]
                 vals[10]=number(pf)
