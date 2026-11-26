@@ -63,14 +63,17 @@ class ScanWorker(QObject):
             self.finished.emit()
 
 class HistoricalWorker(QObject):
-    succeeded=Signal(object,object)
+    succeeded=Signal(object,object,object)
     failed=Signal(str)
     finished=Signal()
-    def __init__(self,h,report):
-        super().__init__(); self.h=h; self.report=report
+    def __init__(self,snapshot,directory,years,holding,cost):
+        super().__init__(); self.args=(snapshot,directory,years,holding,cost)
     @Slot()
     def run(self):
-        try: self.succeeded.emit(*historical(self.h,self.report))
+        try:
+            h,report=export_scan(*self.args)
+            result,path=historical(h,report)
+            self.succeeded.emit(result,path,report)
         except Exception as exc: self.failed.emit(str(exc))
         finally: self.finished.emit()
 
@@ -265,21 +268,21 @@ class Window(QMainWindow):
             self.history_status.setText('A completed live scan is required.'); return
         if not self.snapshot[3]: self.history_status.setText('No qualifying tickers; simulation skipped.'); return
         if QMessageBox.question(self,'Historical simulation','Run historical research for the completed scan? The interface remains responsive; cancellation is not yet available for this operation.') != QMessageBox.StandardButton.Yes: return
-        try:
-            h,report=export_scan(self.snapshot,self.reports_dir(),self.years.value(),self.holding.value(),self.cost.value())
-        except Exception as exc: self.history_status.setText('Export failed: '+str(exc)); return
-        self.report_status.setText(str(report)); self.history_status.setText('Historical simulation running…'); self.history_context=(self.scan_uuid,report,utc(),str(uuid4()))
+        if self._db_thread is not None:
+            self.history_status.setText('Database operation busy; retry when finished.'); return
+        args=(self.snapshot,Path.home()/'Nasdaq_Quant_Research_V2_Reports',self.years.value(),self.holding.value(),self.cost.value())
+        self.history_status.setText('Preparing report and historical simulation in background…'); self.history_context=(self.scan_uuid,utc(),str(uuid4()))
         for control in (self.backtest_button,self.export_button,self.live,self.run): control.setEnabled(False)
-        self._history_thread=QThread(self); self._history_worker=HistoricalWorker(h,report); self._history_worker.moveToThread(self._history_thread)
+        self._history_thread=QThread(self); self._history_worker=HistoricalWorker(*args); self._history_worker.moveToThread(self._history_thread)
         self._history_thread.started.connect(self._history_worker.run); self._history_worker.succeeded.connect(self.history_done); self._history_worker.failed.connect(self.history_failed); self._history_worker.finished.connect(self._history_thread.quit); self._history_worker.finished.connect(self._history_worker.deleteLater); self._history_thread.finished.connect(self.history_finished); self._history_thread.finished.connect(self._history_thread.deleteLater); self._history_thread.start()
-    @Slot(object,object)
-    def history_done(self,result,path):
+    @Slot(object,object,object)
+    def history_done(self,result,path,screen):
         if result.backtest is None: self.history_status.setText('No historical simulation performed.'); return
         sim=result.backtest.analysis.simulation
         self.history_status.setText(f'Historical period: {result.start_date} through {result.end_date} | Signals: {sim.total_signals} | Completed trades: {len(sim.trades)}\nIntegrated report: {path}')
-        self.report_status.setText(str(path)); uid,screen,started,run_uuid=self.history_context; self.pending_history=(uid,result,path,screen,started,utc(),run_uuid); self.save_pending_history()
+        self.report_status.setText(str(path)); uid,started,run_uuid=self.history_context; self.pending_history=(uid,result,path,screen,started,utc(),run_uuid); self.save_pending_history()
     @Slot(str)
-    def history_failed(self,message): self.history_status.setText('Historical simulation/report failed: '+message+' — screening report retained.')
+    def history_failed(self,message): self.history_status.setText('Historical simulation/report failed: '+message+' — any completed local files are retained.')
     @Slot()
     def history_finished(self):
         self._history_thread=None; self._history_worker=None
@@ -340,7 +343,7 @@ class Window(QMainWindow):
             self.report_message('Database busy; retry Save latest screening report.'); return
         args=self.pending_report; repo=self.repo
         self.report_message('Saving screening report to MySQL…')
-        self.db_job(lambda:repo.save_report(*args),lambda run:self.report_message(f'Screening report saved to MySQL: run {run}'))
+        self.db_job(lambda:repo.save_report(*args),lambda value:self.report_message(f'Screening report saved to MySQL: run {value[0]}' if value[1] else f'Screening report already recorded: run {value[0]}; new local file retained'))
     def report_message(self,message):
         self.report_status.setText(message); self.db_status.setText(message); self.statusBar().showMessage(message)
     def save_pending_history(self):

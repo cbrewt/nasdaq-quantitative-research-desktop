@@ -15,6 +15,7 @@ class Repository:
         import mysql.connector
         cn=mysql.connector.connect(host='127.0.0.1',port=self.port,user='nasdaq_research_app',password=self._password,database='nasdaq_quant_research_v2',connection_timeout=10,autocommit=False)
         try:
+            cn.start_transaction(isolation_level="READ COMMITTED")
             yield cn
             cn.commit()
         except BaseException:
@@ -55,13 +56,18 @@ class Repository:
     def _insert_report(self,cur,run,path,kind):
         from pathlib import Path
         import hashlib
+        # Connection-scoped lock is released when connection closes after commit/rollback.
+        lock=f'nqr_v2_report_{run}_{kind}'
+        cur.execute('SELECT GET_LOCK(%s, %s)',(lock,10))
+        if cur.fetchone()[0]!=1: raise RuntimeError('Report save busy; retry when finished.')
+        cur.execute('SELECT report_id FROM research_report WHERE run_id=%s AND report_kind=%s LIMIT 1',(run,kind))
+        if cur.fetchone(): return False
         p=Path(path); payload=p.read_bytes(); sha=hashlib.sha256(payload).hexdigest()
-        cur.execute('SELECT report_id FROM research_report WHERE run_id=%s AND sha256=%s AND report_kind=%s',(run,sha,kind))
-        if cur.fetchone(): return
         cur.execute('INSERT INTO research_report (run_id,report_kind,generated_utc,filename,sha256,payload) VALUES (%s,%s,%s,%s,%s,%s)',(run,kind,utc(),p.name,sha,payload))
+        return True
     def save_report(self,uid,path):
         with self.connection() as cn:
-            cur=cn.cursor(); run=self._source_run(cur,uid); self._insert_report(cur,run,path,'SCREENING'); return run
+            cur=cn.cursor(); run=self._source_run(cur,uid); return run,self._insert_report(cur,run,path,'SCREENING')
     def save_history(self,uid,result,path,screen_report,started,finished,run_uuid):
         h=result.handoff; b=result.backtest; sim=b.analysis.simulation
         if not hasattr(b,'scored_signals'): raise ValueError('Strict-mode result does not expose all historical signals; report retained locally, not saved as a complete simulation.')
