@@ -30,6 +30,32 @@ from Backtesting_Engine.signal_engine import (
 )
 
 
+# CAL-001: independently verified first trading sessions, not inferred from provider gaps.
+VERIFIED_LISTINGS = {
+    "STAK": (date(2025, 2, 26), "https://www.sec.gov/Archives/edgar/data/2002453/000149315225009229/ex99-1.htm"),
+}
+
+
+def eligible_calendar(symbol, dates, observed_dates):
+    """Require the complete reference calendar from verified listing onward."""
+    evidence = VERIFIED_LISTINGS.get(symbol)
+    expected = [d for d in dates if evidence is None or d >= evidence[0]]
+    if not expected or observed_dates != expected:
+        missing = sorted(set(expected) - set(observed_dates))
+        extra = sorted(set(observed_dates) - set(expected))
+        raise ValueError(
+            f"Historical trading-calendar mismatch for {symbol}: "
+            f"missing={len(missing)}, unexpected={len(extra)}, "
+            f"duplicate={len(observed_dates)-len(set(observed_dates))}; "
+            f"first missing={missing[:3]}, first unexpected={extra[:3]}. "
+            "Unverified leading absence, internal/trailing gaps and unordered dates are not accepted."
+        )
+    if len(expected) < len(dates):
+        print(f"CAL-001: {symbol}: {len(dates)-len(expected)} verified pre-listing sessions excluded; "
+              f"first trading date {evidence[0]}; source {evidence[1]}", flush=True)
+    return expected
+
+
 @dataclass(frozen=True)
 class CapturedStrictResult:
     """Results of a multiple-stock historical backtest."""
@@ -72,9 +98,8 @@ def run_multi_stock_backtest(
         Include future sessions after the last
         signal when completed exits are required.
 
-    Missing or mismatched market-data sessions
-    raise an error rather than being silently
-    excluded from the research sample.
+    Only independently verified pre-listing absence is accepted.
+    Other missing or mismatched sessions raise an error.
 
     Returns combined simulation results and
     individual stock signal counts.
@@ -241,32 +266,25 @@ def run_multi_stock_backtest(
             end_date=dates[-1],
         )
 
-        # Require every expected exchange session
-        # to exist, with no unexpected extra dates.
-        # This strict policy is intended for the
-        # initial small-universe research prototype.
+        # Only independently verified pre-listing sessions may be absent.
         observed_dates = list(history.index.date)
-
-        if observed_dates != dates:
-            raise ValueError(
-                f"Historical trading-calendar mismatch "
-                f"for {symbol}. Review missing or "
-                f"unexpected observations."
-            )
-
+        symbol_dates = eligible_calendar(symbol, dates, observed_dates)
         histories[symbol] = history
 
-        # Generate historical momentum signals.
-        signals = evaluate_historical_period(
-            ticker=symbol,
-            history=history,
-            trading_dates=dates,
-            start_date=evaluation_start,
-            end_date=evaluation_end,
-            min_gain_pct=min_gain_pct,
-            min_price=min_price,
-            max_price=max_price,
-        )
+        # The original evaluator enforces its 21-session window and indicator
+        # eligibility. Do not fabricate pre-listing observations or warmup data.
+        signals = []
+        if len(symbol_dates) >= SESSION_COUNT:
+            signals = evaluate_historical_period(
+                ticker=symbol,
+                history=history,
+                trading_dates=symbol_dates,
+                start_date=evaluation_start,
+                end_date=evaluation_end,
+                min_gain_pct=min_gain_pct,
+                min_price=min_price,
+                max_price=max_price,
+            )
 
         all_signals.extend(signals)
 
