@@ -88,7 +88,7 @@ class HistoricalWorker(QObject):
 
 class Window(QMainWindow):
     def __init__(self):
-        super().__init__(); self.setWindowTitle('Nasdaq Quantitative Research V2.0 — Prototype'); self.resize(1280,800); self.setMinimumSize(800,560)
+        super().__init__(); self.setWindowTitle('Nasdaq Quantitative Research V2.0'); self.resize(1280,800); self.setMinimumSize(800,560)
         self.setStyleSheet('''QWidget {background:#141e2c;color:#e5edf6;font-size:14px;} QGroupBox {border:1px solid #394b62;border-radius:6px;margin-top:14px;padding:12px;} QGroupBox::title {subcontrol-origin:margin;left:12px;} QListWidget,QTableView,QLineEdit,QDoubleSpinBox,QComboBox {background:#202e40;border:1px solid #45566b;padding:5px;} QListWidget::item {padding:13px;} QListWidget::item:selected {background:#315c83;} QPushButton {background:#25689e;padding:9px 15px;border-radius:5px;} QPushButton:disabled {background:#303b49;color:#a6b3c2;} QHeaderView::section {background:#2b3d53;padding:7px;border:0;} QTableView {alternate-background-color:#192637;gridline-color:#36465a;} QLabel#heading {font-size:25px;font-weight:bold;} QWidget:focus {outline:1px solid #8ac8fb;}''')
         root=QWidget(); self.setCentralWidget(root); outer=QVBoxLayout(root)
         self._report_thread=None; self._report_worker=None; self.repo=None; self._db_thread=None; self._db_worker=None; self.saved_uuid=None; self.banner=QLabel('LIVE SCREENING • Sample preview available • Database not connected'); banner=self.banner; banner.setStyleSheet('background:#4b3821;color:#ffe3b0;padding:10px;font-weight:bold'); outer.addWidget(banner)
@@ -99,7 +99,7 @@ class Window(QMainWindow):
         for name in ['File','Research','View','Tools','Help']:
             menu=self.menuBar().addMenu(name)
             if name=='File': menu.addAction('Exit',self.close)
-            elif name=='Help': menu.addAction('About prototype',lambda: QMessageBox.information(self,'Prototype','UID-001 screening integration. Background processing and cooperative cancellation enabled.'))
+            elif name=='Help': menu.addAction('About Nasdaq Quantitative Research',lambda: QMessageBox.information(self,'About Nasdaq Quantitative Research','Nasdaq Quantitative Research V2.0 | Desktop Edition | Windows 11 | MySQL'))
             else:
                 for i,title in enumerate(NAMES): menu.addAction(title,lambda checked=False,i=i:self.nav.setCurrentRow(i))
         self.nav.setCurrentRow(0); self.statusBar().showMessage('Ready | Database: not connected')
