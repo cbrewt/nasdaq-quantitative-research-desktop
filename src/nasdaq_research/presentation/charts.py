@@ -11,6 +11,17 @@ PANELS = (("Closing price ($)", (("Close", "#8ac8fb"),), None),
           ("RSI", (("RSI", "#c3a5fb"),), (30,50,70)),
           ("Relative volume", (("RelativeVolume", "#8ac8fb"),), 1))
 
+def axis_label(title, value):
+    if title == "Closing price ($)":
+        return f"{value:.2f}"
+    if title == "Trading volume (shares)":
+        for scale, suffix in ((1_000_000, "M"), (1_000, "K")):
+            if abs(value) >= scale:
+                return f"{value / scale:.1f}".rstrip("0").rstrip(".") + suffix
+        return f"{value:.0f}"
+    return format(value, '.4g')
+
+
 def extract(frame):
     dates = [str(x)[:10] for x in frame.index]
     values = {key: [number(x) for x in frame[key]] if key in frame else [None]*len(dates)
@@ -36,13 +47,19 @@ class Chart(QWidget):
         left,right,top,bottom=83,max(84,self.width()-14),32,self.height()-24
         def y(v): return bottom-(v-lo)/(hi-lo)*(bottom-top)
         def x(i): return left+(right-left)*i/max(1,len(self.dates)-1)
-        for value in (lo,(lo+hi)/2,hi):
+        # Prioritize reference labels over nearby ordinary axis labels.
+        ticks = [v for v in (lo,(lo+hi)/2,hi)
+                 if all(abs(y(v)-y(r)) >= 17 for r in refs)]
+        for value in ticks:
             painter.setPen(QColor('#42536a')); painter.drawLine(QPointF(left,y(value)),QPointF(right,y(value)))
-            painter.setPen(QColor('#c8d3df')); painter.drawText(QRectF(2,y(value)-8,left-8,16),Qt.AlignmentFlag.AlignRight,format(value,'.4g'))
+            painter.setPen(QColor('#c8d3df')); painter.drawText(QRectF(2,y(value)-8,left-8,16),Qt.AlignmentFlag.AlignRight,axis_label(title,value))
         for value in refs:
             pen=QPen(QColor('#a3afbd')); pen.setStyle(Qt.PenStyle.DashLine); painter.setPen(pen); painter.drawLine(QPointF(left,y(value)),QPointF(right,y(value)))
+            painter.setPen(QColor('#e5edf6'))
+            label = '1.0' if title == 'Relative volume' else axis_label(title,value)
+            painter.drawText(QRectF(2,y(value)-8,left-8,16),Qt.AlignmentFlag.AlignRight,label)
         for j,(key,color) in enumerate(series):
-            vals=self.values.get(key,[]); painter.setPen(QColor(color)); painter.drawText(max(left,right-155*(len(series)-j)),19,key)
+            vals=self.values.get(key,[]); painter.setPen(QColor(color)); painter.drawText(max(left,right-155*(len(series)-j)),19,"RVOL" if key == "RelativeVolume" else key)
             previous=None
             for i,v in enumerate(vals):
                 if v is None: previous=None; continue
