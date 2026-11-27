@@ -716,3 +716,13 @@ Approved November 25, 2026. Dedicated MySQL schema, fourteen tables, migration 0
 ## UID-001 - User interface design approval
 
 Approved November 25, 2026 under DEV-002. Dark resizable desktop interface, six workspaces, persistent sidebar and approved interaction standards. See docs/UID-001_INTERFACE_DESIGN.md. Prototype implementation requires separate Milestone 05 authorization.
+
+
+## Release implementation and acceptance record (November 27, 2026)
+
+- CAL-001: permit only verified pre-listing absences; preserve strict rejection of unverified or internal/trailing gaps. See calendar validation specification.
+- Input capture: preserve actual engine-boundary provider observations and manifest, rather than refetching market data. Replay test utilities remain local packages; no in-app replay control is claimed.
+- QA comparison: identical archived inputs; controlled historical comparison excludes STAK and LSE from both engines because unmodified V1.2 cannot process the calendar exception. This is not a production exclusion. Research and Strict offline replay passed for the tested runs.
+- Performance: user accepted observed responsiveness and execution times; no formal live benchmark. Qt offscreen font warning documented; normal Windows rendering verified.
+- Deployment: local desktop shortcut using existing pythonw.exe, project working directory and launch_desktop.py; no new dependencies or standalone installer. Windows startup and database connectivity verified. Release branding commit 868afe5.
+- Step 12 remains open pending final backup evidence and explicit user acceptance. Further enhancements are separate initiatives.

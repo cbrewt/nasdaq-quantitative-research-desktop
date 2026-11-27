@@ -1,5 +1,7 @@
 # Milestone 10 — screening persistence checkpoint
 
+> Historical design/checkpoint record. For current implementation, QA scope and outstanding release gates as of November 27, 2026, see [release notes](RELEASE_NOTES.md). Original requirements and historical evidence below are retained.
+
 Uses existing restricted account, parameterized transactional inserts, session-only password and background DB operations. Saves qualified screening outputs and display observations; does not capture raw provider inputs, rejected universe, historical simulations or report payloads yet. Not a replayable snapshot. Milestone 10 not complete.
 
 ## Historical persistence checkpoint

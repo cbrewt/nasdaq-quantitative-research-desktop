@@ -1,4 +1,4 @@
-﻿# Nasdaq Quantitative Research
+# Nasdaq Quantitative Research
 # Version 2.0 - Desktop Edition
 
 ## Development Milestone Register
@@ -460,3 +460,16 @@ November 25, 2026: User accepted historical simulation and reporting and authori
 ## Milestone 10 - Database Integration
 
 Screening output persistence checkpoint; further integration and verification pending.
+
+
+## Milestone 10 — Formal acceptance
+
+November 27, 2026: formally accepted by the user and Step 11 authorized under DEV-002. Research runs 13/14: 297 artifact chunks verified; offline replay reproduced 79 screening matches, 7,910 signals and 2,026 trades. Research and Strict persistence, report references and duplicate guard tested. Older output-only runs are not replayable.
+
+## Milestone 11 — Formal acceptance
+
+November 27, 2026: user formally accepted Step 11 within documented verification scope and authorized Step 12. 53 automated tests in nine suites passed (28.184 seconds total QA gate). Strict runs 15/16: 94 chunks, six screening matches, 32 signals and 17 trades reproduced. Original V1.2 screening comparison passed; controlled historical comparison passed on four common-calendar stocks, excluding STAK and LSE due to CAL-001. Populated backup restored in isolated schema; all 14 table checksums matched, all 19 foreign keys had zero orphan records. Restricted DML permission probes passed; DDL assessed through grants in this milestone. Chart refinement commit 875bd60; Windows visual checks and observed performance accepted. See release notes for limits.
+
+## Milestone 12 — In progress
+
+November 27, 2026: desktop shortcut launch and MySQL retrieval verified (nine saved scans). Release title and About dialog verified after commit 868afe5. Documentation prepared; final backup verification and formal product acceptance pending. Do not declare project complete before those gates.

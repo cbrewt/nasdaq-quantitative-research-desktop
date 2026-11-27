@@ -1,5 +1,7 @@
 # Milestone 03 — Database implementation and verification
 
+> Historical design/checkpoint record. For current implementation, QA scope and outstanding release gates as of November 27, 2026, see [release notes](../RELEASE_NOTES.md). Original requirements and historical evidence below are retained.
+
 Accepted November 25, 2026. DBD-001 approved; original design proposal retained as historical reference.
 
 Database: `nasdaq_quant_research_v2`; recovery: `nasdaq_quant_research_v2_restore_test`; application account: `nasdaq_research_app@127.0.0.1`.

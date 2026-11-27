@@ -19,7 +19,7 @@ Definitive project endpoint: Step 12
 
 ## Step 01 - Baseline Protection and Development Environment
 
-Status: IN PROGRESS
+Status: FORMALLY ACCEPTED
 
 Acceptance criteria:
 
@@ -34,7 +34,7 @@ Acceptance criteria:
 
 ## Step 02 - Source Code Audit and Application Architecture
 
-Status: PENDING
+Status: FORMALLY ACCEPTED
 
 Acceptance criteria:
 
@@ -48,7 +48,7 @@ Acceptance criteria:
 
 ## Step 03 - MySQL Database Design
 
-Status: PENDING
+Status: FORMALLY ACCEPTED
 
 Acceptance criteria:
 
@@ -64,7 +64,7 @@ Acceptance criteria:
 
 ## Step 04 - Desktop Interface Design
 
-Status: PENDING
+Status: FORMALLY ACCEPTED
 
 Acceptance criteria:
 
@@ -79,7 +79,7 @@ Acceptance criteria:
 
 ## Step 05 - Functional Desktop Prototype
 
-Status: PENDING
+Status: FORMALLY ACCEPTED
 
 Acceptance criteria:
 
@@ -92,7 +92,7 @@ Acceptance criteria:
 
 ## Step 06 - Quantitative Research Engine Integration
 
-Status: PENDING
+Status: FORMALLY ACCEPTED
 
 Acceptance criteria:
 
@@ -106,7 +106,7 @@ Acceptance criteria:
 
 ## Step 07 - Background Processing
 
-Status: PENDING
+Status: FORMALLY ACCEPTED
 
 Acceptance criteria:
 
@@ -118,7 +118,7 @@ Acceptance criteria:
 
 ## Step 08 - Technical Analysis Interface
 
-Status: PENDING
+Status: FORMALLY ACCEPTED
 
 Acceptance criteria:
 
@@ -130,7 +130,7 @@ Acceptance criteria:
 
 ## Step 09 - Historical Simulation and Reporting
 
-Status: PENDING
+Status: FORMALLY ACCEPTED
 
 Acceptance criteria:
 
@@ -142,7 +142,7 @@ Acceptance criteria:
 
 ## Step 10 - Research Database Integration
 
-Status: PENDING
+Status: FORMALLY ACCEPTED
 
 Acceptance criteria:
 
@@ -156,7 +156,7 @@ Acceptance criteria:
 
 ## Step 11 - Comprehensive Quality Assurance
 
-Status: PENDING
+Status: FORMALLY ACCEPTED
 
 Acceptance criteria:
 
@@ -173,7 +173,7 @@ Acceptance criteria:
 
 ## Step 12 - Windows Deployment and Formal Acceptance
 
-Status: PENDING
+Status: IN PROGRESS — final backups and formal acceptance pending
 
 Acceptance criteria:
 

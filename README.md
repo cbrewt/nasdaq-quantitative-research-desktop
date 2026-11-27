@@ -5,9 +5,9 @@
 ### Project Status
 
 - Version: 2.0
-- Status: Under development
+- Status: Release acceptance pending
 - Development commencement: November 24, 2026
-- Development milestone: Step 1 of 12
+- Development milestone: Step 12 of 12 (11 formally accepted)
 
 ## Project Objective
 
@@ -87,13 +87,18 @@ Step 12 constitutes the definitive project endpoint.
 
 ## Current Development Status
 
-Development environment established.
-Approved dependencies installed and verified.
-Independent local Git repository initialized.
-Application implementation has not yet commenced.
-MySQL database has not yet been created.
+As of November 27, 2026: Milestones 1–11 formally accepted. Windows desktop deployment and release branding verified. Final documentation, source/database backups and formal Step 12 acceptance remain pending. See [release notes](docs/RELEASE_NOTES.md) for verification scope and limitations. Earlier design/checkpoint documents are historical records, not current status.
+
+## Launch and operate
+
+Double-click the Windows desktop shortcut **Nasdaq Quantitative Research V2.0** or run from the project root in PowerShell:
+
+```powershell
+.\.venv\Scripts\python.exe .\launch_desktop.py
+```
+
+In Settings, connect to the dedicated local MySQL database with the application account password. See [User guide](docs/USER_GUIDE.md), [Backup and recovery](docs/BACKUP_RECOVERY.md), [Architecture](docs/ARCHITECTURE.md), and [Quantitative contract](docs/QUANTITATIVE_CONTRACT.md).
 
 ## Distribution
 
-Local development project.
-No remote repository or external distribution configured.
+Local Windows deployment using the existing virtual environment; not a standalone redistributable executable. Keep credentials, local reports, SQL backups and development packages outside Git. Preserve the original V1.2 application independently.

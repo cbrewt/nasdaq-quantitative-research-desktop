@@ -1,4 +1,6 @@
-﻿# Nasdaq Quantitative Research V2.0
+# Nasdaq Quantitative Research V2.0
+
+> Historical design/checkpoint record. For current implementation, QA scope and outstanding release gates as of November 27, 2026, see [release notes](RELEASE_NOTES.md). Original requirements and historical evidence below are retained.
 
 ## Quantitative Preservation Contract
 
